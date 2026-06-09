@@ -25,6 +25,7 @@ import AdUI
 import TelegramNotices
 import ReactionListContextMenuContent
 import TelegramUIPreferences
+import AyuGramCore
 import TranslateUI
 import DebugSettingsUI
 import ChatPresentationInterfaceState
@@ -44,6 +45,7 @@ private struct MessageContextMenuData {
     let canPin: Bool
     let canEdit: Bool
     let canSelect: Bool
+    let canReadUntil: Bool
     let resourceStatus: EngineMediaResource.FetchStatus?
     let messageActions: ChatAvailableMessageActions
 }
@@ -480,7 +482,7 @@ func updatedChatEditInterfaceMessageState(context: AccountContext, state: ChatPr
     )
 }
 
-func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState: ChatPresentationInterfaceState, context: AccountContext, messages: [Message], controllerInteraction: ChatControllerInteraction?, selectAll: Bool, interfaceInteraction: ChatPanelInterfaceInteraction?, readStats: MessageReadStats? = nil, messageNode: ChatMessageItemView? = nil) -> Signal<ContextController.Items, NoError> {
+func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState: ChatPresentationInterfaceState, context: AccountContext, messages: [Message], controllerInteraction: ChatControllerInteraction?, selectAll: Bool, interfaceInteraction: ChatPanelInterfaceInteraction?, readStats: MessageReadStats? = nil, messageNode: ChatMessageItemView? = nil, readUntilMessage: ((Message) -> Void)? = nil) -> Signal<ContextController.Items, NoError> {
     guard let interfaceInteraction = interfaceInteraction, let controllerInteraction = controllerInteraction else {
         return .single(ContextController.Items(content: .list([])))
     }
@@ -854,19 +856,19 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
         )
     }
 
-    let readCounters: Signal<Bool, NoError>
+    let readCounters: Signal<(Bool, Bool), NoError>
     if case let .replyThread(threadMessage) = chatPresentationInterfaceState.chatLocation, threadMessage.isForumPost {
         readCounters = context.engine.data.get(TelegramEngine.EngineData.Item.Peer.ThreadData(id: threadMessage.peerId, threadId: threadMessage.threadId))
-        |> map { threadData -> Bool in
+        |> map { threadData -> (Bool, Bool) in
             guard let threadData else {
-                return false
+                return (false, false)
             }
-            return threadData.maxOutgoingReadId >= message.id.id
+            return (threadData.maxOutgoingReadId >= message.id.id, threadData.maxIncomingReadId >= message.id.id)
         }
     } else {
         readCounters = context.engine.data.get(TelegramEngine.EngineData.Item.Messages.PeerReadCounters(id: messages[0].id.peerId))
-        |> map { readCounters -> Bool in
-            return readCounters.isOutgoingMessageIndexRead(message.index)
+        |> map { readCounters -> (Bool, Bool) in
+            return (readCounters.isOutgoingMessageIndexRead(message.index), readCounters.isIncomingMessageIndexRead(message.index))
         }
     }
     
@@ -883,12 +885,14 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
         readCounters,
         ApplicationSpecificNotice.getMessageViewsPrivacyTips(accountManager: context.sharedContext.accountManager),
         context.engine.stickers.availableReactions(),
-        context.sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.translationSettings, SharedDataKeys.loggingSettings]) |> take(1),
+        context.sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.translationSettings, ApplicationSpecificSharedDataKeys.ayuGramSettings, SharedDataKeys.loggingSettings]) |> take(1),
         context.engine.peers.notificationSoundList() |> take(1),
         context.engine.data.get(TelegramEngine.EngineData.Item.Peer.Peer(id: context.account.peerId))
     )
-    |> map { limitsAndAppConfig, stickerSaveStatus, resourceStatus, messageActions, updatingMessageMedia, infoSummaryData, isMessageRead, messageViewsPrivacyTips, availableReactions, sharedData, notificationSoundList, accountPeer -> (MessageContextMenuData, [MessageId: ChatUpdatingMessageMedia], InfoSummaryData, AppConfiguration, Bool, Int32, AvailableReactions?, TranslationSettings, LoggingSettings, NotificationSoundList?, EnginePeer?) in
+    |> map { limitsAndAppConfig, stickerSaveStatus, resourceStatus, messageActions, updatingMessageMedia, infoSummaryData, readState, messageViewsPrivacyTips, availableReactions, sharedData, notificationSoundList, accountPeer -> (MessageContextMenuData, [MessageId: ChatUpdatingMessageMedia], InfoSummaryData, AppConfiguration, Bool, Int32, AvailableReactions?, TranslationSettings, LoggingSettings, NotificationSoundList?, EnginePeer?) in
         let (limitsConfiguration, appConfig) = limitsAndAppConfig
+        let isMessageRead = readState.0
+        let isIncomingMessageRead = readState.1
         var canEdit = false
         if !isAction {
             let message = messages[0]
@@ -908,6 +912,12 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
         } else {
             loggingSettings = LoggingSettings.defaultSettings
         }
+
+        let ayuSettings = ayuGramSettings(sharedData: sharedData)
+        let accountId = context.account.peerId.id._internalGetInt64Value()
+        let ghostSettings = ayuSettings.useGlobalGhostMode ? ayuSettings.globalGhostSettings : (ayuSettings.ghostAccounts[accountId] ?? AyuGramGhostSettings.defaultSettings)
+        let ghostPolicy = AyuGramGhostPolicy(sendReadMessages: ghostSettings.sendReadMessages && !ghostSettings.sendReadMessagesLocked)
+        let canReadUntil = !ghostPolicy.shouldApplyAutomaticReadHistory && !isIncomingMessageRead && messages.count == 1 && message.id.namespace == Namespaces.Message.Cloud && message.effectivelyIncoming(context.account.peerId)
         
         var messageActions = messageActions
         if isEmbeddedMode {
@@ -931,6 +941,7 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
             canPin: canPin && !isEmbeddedMode,
             canEdit: canEdit && !isEmbeddedMode,
             canSelect: canSelect && !isEmbeddedMode,
+            canReadUntil: canReadUntil,
             resourceStatus: resourceStatus,
             messageActions: messageActions
         )
@@ -1163,6 +1174,15 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
             })))
         }
         
+        if data.canReadUntil, let readUntilMessage = readUntilMessage {
+            actions.append(.action(ContextMenuActionItem(text: "Read Until", icon: { theme in
+                return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Read"), color: theme.actionSheet.primaryTextColor)
+            }, action: { _, f in
+                readUntilMessage(message)
+                f(.dismissWithoutContent)
+            })))
+        }
+
         var isReplyThreadHead = false
         if case let .replyThread(replyThreadMessage) = chatPresentationInterfaceState.chatLocation {
             isReplyThreadHead = messages[0].id == replyThreadMessage.effectiveTopId

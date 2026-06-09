@@ -61,4 +61,19 @@ final class AyuGramFilterEngineTests: XCTestCase {
         XCTAssertTrue(ayuGramShouldHideMessage(store: store, text: "hello", dialogId: nil))
         XCTAssertFalse(ayuGramShouldHideMessage(store: store, text: "neutral", dialogId: nil))
     }
+
+    func testChatMessageFilteringRequiresBothSettings() {
+        let store = AyuGramFilterStore(filters: [AyuGramFilter(text: "hello")])
+
+        XCTAssertFalse(ayuGramShouldHideChatMessage(settings: AyuGramSettings(filtersEnabled: false, filtersEnabledInChats: true), store: store, text: "hello", dialogId: nil))
+        XCTAssertFalse(ayuGramShouldHideChatMessage(settings: AyuGramSettings(filtersEnabled: true, filtersEnabledInChats: false), store: store, text: "hello", dialogId: nil))
+        XCTAssertTrue(ayuGramShouldHideChatMessage(settings: AyuGramSettings(filtersEnabled: true, filtersEnabledInChats: true), store: store, text: "hello", dialogId: nil))
+    }
+
+    func testChatMessageFilteringCanMatchEmptyTextWithReversedFilter() {
+        let store = AyuGramFilterStore(filters: [AyuGramFilter(text: "hello", reversed: true)])
+        let settings = AyuGramSettings(filtersEnabled: true, filtersEnabledInChats: true)
+
+        XCTAssertTrue(ayuGramShouldHideChatMessage(settings: settings, store: store, text: "", dialogId: nil))
+    }
 }

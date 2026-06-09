@@ -44,6 +44,7 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
 
     case filtersHeader
     case filtersEnabled(Bool)
+    case filtersEnabledInChats(Bool)
     case filtersList
 
     case appearanceHeader
@@ -67,7 +68,7 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return AyuGramSettingsSection.ghostMode.rawValue
         case .messageHistoryHeader, .saveDeletedMessages, .saveMessagesHistory:
             return AyuGramSettingsSection.messageHistory.rawValue
-        case .filtersHeader, .filtersEnabled, .filtersList:
+        case .filtersHeader, .filtersEnabled, .filtersEnabledInChats, .filtersList:
             return AyuGramSettingsSection.filters.rawValue
         case .appearanceHeader, .semiTransparentDeletedMessages, .removeMessageTail:
             return AyuGramSettingsSection.appearance.rawValue
@@ -98,8 +99,10 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return 200
         case .filtersEnabled:
             return 201
-        case .filtersList:
+        case .filtersEnabledInChats:
             return 202
+        case .filtersList:
+            return 203
         case .appearanceHeader:
             return 300
         case .semiTransparentDeletedMessages:
@@ -156,6 +159,8 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return ItemListSectionHeaderItem(presentationData: presentationData, text: "FILTERS", sectionId: self.section)
         case let .filtersEnabled(value):
             return ayuGramSwitchItem(presentationData: presentationData, title: "Enable Filters", value: value, section: self.section, arguments: arguments, keyPath: \.filtersEnabled)
+        case let .filtersEnabledInChats(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "Apply Filters in Chats", value: value, section: self.section, arguments: arguments, keyPath: \.filtersEnabledInChats)
         case .filtersList:
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "Filters", label: "", sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                 arguments.openFilters()
@@ -222,6 +227,7 @@ private func ayuGramSettingsControllerEntries(settings: AyuGramSettings) -> [Ayu
 
     entries.append(.filtersHeader)
     entries.append(.filtersEnabled(settings.filtersEnabled))
+    entries.append(.filtersEnabledInChats(settings.filtersEnabledInChats))
     entries.append(.filtersList)
 
     entries.append(.appearanceHeader)

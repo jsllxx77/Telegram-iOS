@@ -12,6 +12,7 @@ import TextFormat
 import Markdown
 import Display
 import TelegramStringFormatting
+import AyuGramCore
 
 struct ChatHistoryEntriesForViewState {
     private var messageStableIdToLocalId: [UInt32: Int64] = [:]
@@ -31,6 +32,19 @@ struct ChatHistoryEntriesForViewState {
             }
         }
     }
+}
+
+private func ayuGramShouldHideChatHistoryMessage(
+    _ message: Message,
+    settings: AyuGramSettings,
+    store: AyuGramFilterStore
+) -> Bool {
+    return ayuGramShouldHideChatMessage(
+        settings: settings,
+        store: store,
+        text: message.text,
+        dialogId: message.id.peerId.toInt64()
+    )
 }
 
 func chatHistoryEntriesForView(
@@ -60,6 +74,8 @@ func chatHistoryEntriesForView(
     adMessage: Message?,
     dynamicAdMessages: [Message],
     isMusicPlaylist: Bool,
+    ayuGramSettings: AyuGramSettings,
+    ayuGramFilterStore: AyuGramFilterStore,
     pinToTopStableId: EngineMessage.StableId?
 ) -> ([ChatHistoryEntry], ChatHistoryEntriesForViewState) {
     var currentState = currentState
@@ -141,6 +157,7 @@ func chatHistoryEntriesForView(
     }
     
     var count = 0
+    var hasVisibleHistoryEntries = false
     loop: for entry in view.entries {
         var message = entry.message
         var isRead = entry.isRead
@@ -151,6 +168,10 @@ func chatHistoryEntriesForView(
         }
         
         if pendingRemovedMessages.contains(message.id) {
+            continue
+        }
+
+        if ayuGramShouldHideChatHistoryMessage(message, settings: ayuGramSettings, store: ayuGramFilterStore) {
             continue
         }
         
@@ -234,6 +255,8 @@ func chatHistoryEntriesForView(
                 }
             }
         }
+
+        hasVisibleHistoryEntries = true
     
         var adminRank: CachedChannelAdminRank?
         if let author = message.author {
@@ -467,10 +490,15 @@ func chatHistoryEntriesForView(
                 if !messages.isEmpty {
                     let selection: ChatHistoryMessageSelection = .none
                     
-                    let topMessage = messages[0]
+                    let visibleThreadHeadMessages = messages.filter { message in
+                        return !ayuGramShouldHideChatHistoryMessage(message, settings: ayuGramSettings, store: ayuGramFilterStore)
+                    }
+                    guard let visibleTopMessage = visibleThreadHeadMessages.first else {
+                        break loop
+                    }
                     
                     var hasTopicCreated = false
-                    inner: for media in topMessage.media {
+                    inner: for media in visibleTopMessage.media {
                         if let action = media as? TelegramMediaAction {
                             switch action.action {
                                 case .topicCreated:
@@ -483,37 +511,37 @@ func chatHistoryEntriesForView(
                     }
                     
                     var adminRank: CachedChannelAdminRank?
-                    if let author = topMessage.author {
+                    if let author = visibleTopMessage.author {
                         adminRank = adminRanks[author.id]
                     }
                     
                     var contentTypeHint: ChatMessageEntryContentType = .generic
-                    if presentationData.largeEmoji, topMessage.media.isEmpty {
-                        if messageIsEligibleForLargeCustomEmoji(topMessage) {
+                    if presentationData.largeEmoji, visibleTopMessage.media.isEmpty {
+                        if messageIsEligibleForLargeCustomEmoji(visibleTopMessage) {
                             contentTypeHint = .animatedEmoji
-                        } else if stickersEnabled && topMessage.text.count == 1, let _ = associatedData.animatedEmojiStickers[topMessage.text.basicEmoji.0] {
+                        } else if stickersEnabled && visibleTopMessage.text.count == 1, let _ = associatedData.animatedEmojiStickers[visibleTopMessage.text.basicEmoji.0] {
                             contentTypeHint = .animatedEmoji
-                        } else if messageIsEligibleForLargeEmoji(topMessage) {
+                        } else if messageIsEligibleForLargeEmoji(visibleTopMessage) {
                             contentTypeHint = .animatedEmoji
                         }
                     }
                     
                     addedThreadHead = true
-                    if messages.count > 1, let groupingKey = messages[0].groupingKey {
+                    if visibleThreadHeadMessages.count > 1, let groupingKey = visibleTopMessage.groupingKey {
                         var groupMessages: [(Message, Bool, ChatHistoryMessageSelection, ChatMessageEntryAttributes, MessageHistoryEntryLocation?)] = []
-                        for message in messages {
+                        for message in visibleThreadHeadMessages {
                             groupMessages.append((message, false, .none, ChatMessageEntryAttributes(rank: adminRank, isContact: false, contentTypeHint: contentTypeHint, updatingMedia: updatingMedia[message.id], isPlaying: false, isCentered: false, authorStoryStats: message.author.flatMap { view.peerStoryStats[$0.id] }, displayContinueThreadFooter: false, pinToTop: false), nil))
                         }
                         entries.insert(.MessageGroupEntry(groupingKey, groupMessages, presentationData), at: 0)
                     } else {
                         if !hasTopicCreated {
-                            entries.insert(.MessageEntry(messages[0], presentationData, false, nil, selection, ChatMessageEntryAttributes(rank: adminRank, isContact: false, contentTypeHint: contentTypeHint, updatingMedia: updatingMedia[messages[0].id], isPlaying: false, isCentered: false, authorStoryStats: messages[0].author.flatMap { view.peerStoryStats[$0.id] }, displayContinueThreadFooter: false, pinToTop: false)), at: 0)
+                            entries.insert(.MessageEntry(visibleTopMessage, presentationData, false, nil, selection, ChatMessageEntryAttributes(rank: adminRank, isContact: false, contentTypeHint: contentTypeHint, updatingMedia: updatingMedia[visibleTopMessage.id], isPlaying: false, isCentered: false, authorStoryStats: visibleTopMessage.author.flatMap { view.peerStoryStats[$0.id] }, displayContinueThreadFooter: false, pinToTop: false)), at: 0)
                         }
                     }
                     
                     if !replyThreadMessage.isForumPost {
-                        let replyCount = view.entries.isEmpty ? 0 : 1
-                        entries.insert(.ReplyCountEntry(messages[0].index, replyThreadMessage.isChannelPost, replyCount, presentationData), at: 1)
+                        let replyCount = hasVisibleHistoryEntries ? 1 : 0
+                        entries.insert(.ReplyCountEntry(visibleTopMessage.index, replyThreadMessage.isChannelPost, replyCount, presentationData), at: 1)
                     }
                 }
                 break loop
@@ -783,7 +811,7 @@ func chatHistoryEntriesForView(
     }
     
     if let subject = associatedData.subject, case let .customChatContents(customChatContents) = subject, case let .quickReplyMessageInput(_, shortcutType) = customChatContents.kind, case .generic = shortcutType {
-        if !view.isLoading && view.laterId == nil && !view.entries.isEmpty {
+        if !view.isLoading && view.laterId == nil && hasVisibleHistoryEntries {
             for i in 0 ..< 2 {
                 let string = i == 1 ? presentationData.strings.Chat_QuickReply_ServiceHeader1 : presentationData.strings.Chat_QuickReply_ServiceHeader2
                 let formattedString = parseMarkdownIntoAttributedString(

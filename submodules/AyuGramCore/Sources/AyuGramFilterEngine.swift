@@ -56,3 +56,15 @@ public func ayuGramMatchingFilters(store: AyuGramFilterStore, input: AyuGramFilt
 public func ayuGramShouldHideMessage(store: AyuGramFilterStore, text: String, dialogId: Int64?) -> Bool {
     return !ayuGramMatchingFilters(store: store, input: AyuGramFilterMatchInput(text: text, dialogId: dialogId)).isEmpty
 }
+
+public func ayuGramShouldHideChatMessage(
+    settings: AyuGramSettings,
+    store: AyuGramFilterStore,
+    text: String,
+    dialogId: Int64?
+) -> Bool {
+    guard settings.filtersEnabled && settings.filtersEnabledInChats else {
+        return false
+    }
+    return ayuGramShouldHideMessage(store: store, text: text, dialogId: dialogId)
+}

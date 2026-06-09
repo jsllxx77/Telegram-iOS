@@ -82,6 +82,7 @@ enum ChatHistoryViewUpdate {
 struct ChatHistoryView {
     let originalView: MessageHistoryView
     let filteredEntries: [ChatHistoryEntry]
+    let hasAyuGramChatFiltering: Bool
     let associatedData: ChatMessageItemAssociatedData
     let lastHeaderId: Int64
     let id: Int32
@@ -154,44 +155,104 @@ struct ChatHistoryListViewTransition {
     var animateFromPreviousFilter: Bool
 }
 
+private func visibleMessagesForChatHistoryEntry(_ entry: ChatHistoryEntry) -> [Message] {
+    switch entry {
+    case let .MessageEntry(message, _, _, _, _, _):
+        return [message]
+    case let .MessageGroupEntry(_, messages, _):
+        return messages.map(\.0)
+    default:
+        return []
+    }
+}
+
+private func visibleMessageCountForChatHistoryView(_ view: ChatHistoryView) -> Int {
+    var count = 0
+    for entry in view.filteredEntries {
+        count += visibleMessagesForChatHistoryEntry(entry).count
+    }
+    return count
+}
+
+private func emptyTypeForVisibleMessage(_ message: Message, accountPeerId: PeerId?) -> ChatHistoryNodeLoadState.EmptyType {
+    for media in message.media {
+        if let action = media as? TelegramMediaAction {
+            if action.action == .peerJoined {
+                return .joined
+            } else if action.action == .historyCleared {
+                return .clearedHistory
+            } else if case .topicCreated = action.action, message.author?.id == accountPeerId {
+                return .topic
+            }
+        }
+    }
+    return .generic
+}
+
+private func emptyTypeForRawHistoryView(_ view: ChatHistoryView, chatLocation: ChatLocation, accountPeerId: PeerId?) -> ChatHistoryNodeLoadState.EmptyType {
+    if let firstEntry = view.originalView.entries.first {
+        return emptyTypeForVisibleMessage(firstEntry.message, accountPeerId: accountPeerId)
+    }
+    if case let .replyThread(replyThreadMessage) = chatLocation {
+        loop: for entry in view.originalView.additionalData {
+            switch entry {
+            case let .message(id, messages) where id == replyThreadMessage.effectiveTopId:
+                if let message = messages.first {
+                    return emptyTypeForVisibleMessage(message, accountPeerId: accountPeerId)
+                }
+                break loop
+            default:
+                break
+            }
+        }
+    }
+    return .generic
+}
+
+private func loadStateForChatHistoryView(_ view: ChatHistoryView, chatLocation: ChatLocation, accountPeerId: PeerId, alwaysHasMessages: Bool) -> ChatHistoryNodeLoadState {
+    if alwaysHasMessages {
+        return .messages
+    }
+    if visibleMessageCountForChatHistoryView(view) == 0 {
+        if view.originalView.isLoading {
+            return .loading(false)
+        }
+        if view.filteredEntries.count == 1, let entry = view.filteredEntries.first, case .ChatInfoEntry = entry {
+            return .empty(.botInfo)
+        }
+        if !view.hasAyuGramChatFiltering {
+            return .empty(emptyTypeForRawHistoryView(view, chatLocation: chatLocation, accountPeerId: accountPeerId))
+        }
+        return .empty(.generic)
+    }
+    if view.originalView.isLoadingEarlier && chatLocation.peerId?.namespace != Namespaces.Peer.CloudUser {
+        return .loading(true)
+    }
+    return .messages
+}
+
 private func maxMessageIndexForEntries(_ view: ChatHistoryView, indexRange: (Int, Int)) -> (incoming: MessageIndex?, overall: MessageIndex?) {
     var incoming: MessageIndex?
     var overall: MessageIndex?
-    var nextLowestIndex: MessageIndex?
-    if indexRange.0 >= 0 && indexRange.0 < view.filteredEntries.count {
-        if indexRange.0 > 0 {
-            nextLowestIndex = view.filteredEntries[indexRange.0 - 1].index
-        }
-    }
-    var nextHighestIndex: MessageIndex?
-    if indexRange.1 >= 0 && indexRange.1 < view.filteredEntries.count {
-        if indexRange.1 < view.filteredEntries.count - 1 {
-            nextHighestIndex = view.filteredEntries[indexRange.1 + 1].index
-        }
-    }
-    for i in (0 ..< view.originalView.entries.count).reversed() {
-        let index = view.originalView.entries[i].index
-        if let nextLowestIndex = nextLowestIndex {
-            if index <= nextLowestIndex {
-                continue
+
+    let lowerBound = max(0, indexRange.0)
+    let upperBound = min(view.filteredEntries.count - 1, indexRange.1)
+    if lowerBound <= upperBound {
+        for i in (lowerBound ... upperBound).reversed() {
+            for message in visibleMessagesForChatHistoryEntry(view.filteredEntries[i]).reversed() {
+                let index = message.index
+                if overall == nil || overall! < index {
+                    overall = index
+                }
+                if !message.flags.intersection(.IsIncomingMask).isEmpty {
+                    if incoming == nil || incoming! < index {
+                        incoming = index
+                    }
+                }
+                if incoming != nil {
+                    return (incoming, overall)
+                }
             }
-        }
-        if let nextHighestIndex = nextHighestIndex {
-            if index >= nextHighestIndex {
-                continue
-            }
-        }
-        let messageEntry = view.originalView.entries[i]
-        if overall == nil || overall! < index {
-            overall = index
-        }
-        if !messageEntry.message.flags.intersection(.IsIncomingMask).isEmpty {
-            if incoming == nil || incoming! < index {
-                incoming = index
-            }
-        }
-        if incoming != nil {
-            return (incoming, overall)
         }
     }
     return (incoming, overall)
@@ -1784,6 +1845,25 @@ public final class ChatHistoryListNodeImpl: ListViewImpl, ChatHistoryNode, ChatH
         } else {
             translationState = .single(nil)
         }
+
+        let ayuGramSettingsSignal = context.sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.ayuGramSettings])
+        |> map { sharedData -> AyuGramSettings in
+            return ayuGramSettings(sharedData: sharedData)
+        }
+        |> distinctUntilChanged
+
+        let ayuGramFilterStore = context.engine.data.subscribe(
+            TelegramEngine.EngineData.Item.Configuration.ApplicationSpecificPreference(key: PreferencesKeys.ayuGramFilterStore())
+        )
+        |> map { entry -> AyuGramFilterStore in
+            return entry?.get(AyuGramFilterStore.self) ?? .empty
+        }
+        |> distinctUntilChanged
+
+        let ayuGramFiltering = combineLatest(ayuGramSettingsSignal, ayuGramFilterStore)
+        |> distinctUntilChanged(isEqual: { lhs, rhs in
+            return lhs.0 == rhs.0 && lhs.1 == rhs.1
+        })
         
         let promises = combineLatest(
             self.historyAppearsClearedPromise.get(),
@@ -1792,7 +1872,8 @@ public final class ChatHistoryListNodeImpl: ListViewImpl, ChatHistoryNode, ChatH
             self.currentlyPlayingMessageIdPromise.get(),
             self.scrollToMessageIdPromise.get(),
             self.chatHasBotsPromise.get(),
-            self.allAdMessagesPromise.get()
+            self.allAdMessagesPromise.get(),
+            ayuGramFiltering
         )
         
         let contentSettings = self.context.engine.data.subscribe(TelegramEngine.EngineData.Item.Configuration.ContentSettings())
@@ -1905,7 +1986,8 @@ public final class ChatHistoryListNodeImpl: ListViewImpl, ChatHistoryNode, ChatH
             deviceContactsNumbers |> debug_measureTimeToFirstEvent(label: "chatHistoryNode_deviceContactsNumbers"),
             contentSettings |> debug_measureTimeToFirstEvent(label: "chatHistoryNode_contentSettings")
         ) |> debug_measureTimeToFirstEvent(label: "chatHistoryNode_firstChatHistoryTransition")).startStrict(next: { [weak self] update, chatPresentationData, selectedMessages, updatingMedia, networkType, preferredStoryHighQuality, animatedEmojiStickers, additionalAnimatedEmojiStickers, customChannelDiscussionReadState, customThreadOutgoingReadState, availableReactions, availableMessageEffects, savedMessageTags, defaultReaction, accountPeer, accountCountry, suggestAudioTranscription, promises, topicAuthorId, translationState, maxReadStoryId, recommendedChannels, audioTranscriptionTrial, chatThemes, deviceContactsNumbers, contentSettings in
-            let (historyAppearsCleared, pendingUnpinnedAllMessages, pendingRemovedMessages, currentlyPlayingMessageIdAndType, scrollToMessageId, chatHasBots, allAdMessages) = promises
+            let (historyAppearsCleared, pendingUnpinnedAllMessages, pendingRemovedMessages, currentlyPlayingMessageIdAndType, scrollToMessageId, chatHasBots, allAdMessages, ayuGramFiltering) = promises
+            let (ayuGramSettings, ayuGramFilterStore) = ayuGramFiltering
             
             if measure_isFirstTime {
                 measure_isFirstTime = false
@@ -1988,7 +2070,7 @@ public final class ChatHistoryListNodeImpl: ListViewImpl, ChatHistoryNode, ChatH
                 
                 if resetScrolling, let previousViewValue = previousView.with({ $0 })?.0 {
                     let filteredEntries: [ChatHistoryEntry] = []
-                    let processedView = ChatHistoryView(originalView: MessageHistoryView(tag: nil, namespaces: .all, entries: [], holeEarlier: false, holeLater: false, isLoading: true), filteredEntries: filteredEntries, associatedData: previousViewValue.associatedData, lastHeaderId: 0, id: previousViewValue.id, locationInput: previousViewValue.locationInput, ignoreMessagesInTimestampRange: nil, ignoreMessageIds: Set())
+                    let processedView = ChatHistoryView(originalView: MessageHistoryView(tag: nil, namespaces: .all, entries: [], holeEarlier: false, holeLater: false, isLoading: true), filteredEntries: filteredEntries, hasAyuGramChatFiltering: false, associatedData: previousViewValue.associatedData, lastHeaderId: 0, id: previousViewValue.id, locationInput: previousViewValue.locationInput, ignoreMessagesInTimestampRange: nil, ignoreMessageIds: Set())
                     let previousValueAndVersion = previousView.swap((processedView, update.1, selectedMessages, allAdMessages.version))
                     let previous = previousValueAndVersion?.0
                     let previousSelectedMessages = previousValueAndVersion?.2
@@ -2206,10 +2288,12 @@ public final class ChatHistoryListNodeImpl: ListViewImpl, ChatHistoryNode, ChatH
                     adMessage: allAdMessages.fixed,
                     dynamicAdMessages: allAdMessages.opportunistic,
                     isMusicPlaylist: isMusicPlaylist,
+                    ayuGramSettings: ayuGramSettings,
+                    ayuGramFilterStore: ayuGramFilterStore,
                     pinToTopStableId: pinToTopStableId
                 )
                 let lastHeaderId = filteredEntries.last.flatMap { listMessageDateHeaderId(timestamp: $0.index.timestamp) } ?? 0
-                let processedView = ChatHistoryView(originalView: view, filteredEntries: filteredEntries, associatedData: associatedData, lastHeaderId: lastHeaderId, id: id, locationInput: update.2, ignoreMessagesInTimestampRange: update.3, ignoreMessageIds: update.4)
+                let processedView = ChatHistoryView(originalView: view, filteredEntries: filteredEntries, hasAyuGramChatFiltering: ayuGramSettings.filtersEnabled && ayuGramSettings.filtersEnabledInChats && !ayuGramFilterStore.filters.isEmpty, associatedData: associatedData, lastHeaderId: lastHeaderId, id: id, locationInput: update.2, ignoreMessagesInTimestampRange: update.3, ignoreMessageIds: update.4)
                 let previousValueAndVersion = previousView.swap((processedView, update.1, selectedMessages, allAdMessages.version))
                 let _ = chatHistoryEntriesForViewState.swap(updatedChatHistoryEntriesForViewState)
                 let previous = previousValueAndVersion?.0
@@ -3766,27 +3850,7 @@ public final class ChatHistoryListNodeImpl: ListViewImpl, ChatHistoryNode, ChatH
         } else {
             self._cachedPeerDataAndMessages.set(.single((transition.cachedData, transition.cachedDataMessages)))
             
-            let loadState: ChatHistoryNodeLoadState
-            if transition.historyView.filteredEntries.isEmpty {
-                if let firstEntry = transition.historyView.originalView.entries.first {
-                    var isPeerJoined = false
-                    for media in firstEntry.message.media {
-                        if let action = media as? TelegramMediaAction, action.action == .peerJoined {
-                            isPeerJoined = true
-                            break
-                        }
-                    }
-                    loadState = .empty(isPeerJoined ? .joined : .generic)
-                } else {
-                    loadState = .empty(.generic)
-                }
-            } else {
-                if transition.historyView.filteredEntries.count == 1, let entry = transition.historyView.filteredEntries.first, case .ChatInfoEntry = entry {
-                    loadState = .empty(.botInfo)
-                } else {
-                    loadState = .messages
-                }
-            }
+            let loadState = loadStateForChatHistoryView(transition.historyView, chatLocation: self.chatLocation, accountPeerId: self.context.account.peerId, alwaysHasMessages: false)
             if self.loadState != loadState {
                 self.loadState = loadState
                 self.loadStateUpdated?(loadState, transition.options.contains(.AnimateInsertion))
@@ -3795,11 +3859,12 @@ public final class ChatHistoryListNodeImpl: ListViewImpl, ChatHistoryNode, ChatH
                 }
             }
             
-            let isEmpty = transition.historyView.originalView.entries.isEmpty || loadState == .empty(.botInfo)
+            let visibleMessageCount = visibleMessageCountForChatHistoryView(transition.historyView)
+            let isEmpty = visibleMessageCount == 0 || loadState == .empty(.botInfo)
             
             var hasReachedLimits = false
             if case let .customChatContents(customChatContents) = self.subject, let messageLimit = customChatContents.messageLimit {
-                hasReachedLimits = transition.historyView.originalView.entries.count >= messageLimit
+                hasReachedLimits = visibleMessageCount >= messageLimit
             }
             
             let historyState: ChatHistoryNodeHistoryState = .loaded(isEmpty: isEmpty, hasReachedLimits: hasReachedLimits)
@@ -4114,64 +4179,8 @@ public final class ChatHistoryListNodeImpl: ListViewImpl, ChatHistoryNode, ChatH
                         alwaysHasMessages = true
                     }
                 }
-                if alwaysHasMessages {
-                    loadState = .messages
-                } else if let historyView = strongSelf.historyView {
-                    if historyView.filteredEntries.isEmpty {
-                        if historyView.originalView.isLoading {
-                            loadState = .loading(false)
-                        } else if let firstEntry = historyView.originalView.entries.first {
-                            var emptyType = ChatHistoryNodeLoadState.EmptyType.generic
-                            for media in firstEntry.message.media {
-                                if let action = media as? TelegramMediaAction {
-                                    if action.action == .peerJoined {
-                                        emptyType = .joined
-                                        break
-                                    } else if action.action == .historyCleared {
-                                        emptyType = .clearedHistory
-                                        break
-                                    } else if case .topicCreated = action.action, firstEntry.message.author?.id == strongSelf.context.account.peerId {
-                                        emptyType = .topic
-                                        break
-                                    }
-                                }
-                            }
-                            loadState = .empty(emptyType)
-                        } else {
-                            var emptyType = ChatHistoryNodeLoadState.EmptyType.generic
-                            if case let .replyThread(replyThreadMessage) = strongSelf.chatLocation {
-                                loop: for entry in historyView.originalView.additionalData {
-                                    switch entry {
-                                        case let .message(id, messages) where id == replyThreadMessage.effectiveTopId:
-                                            if let message = messages.first {
-                                                for media in message.media {
-                                                    if let action = media as? TelegramMediaAction {
-                                                        if case .topicCreated = action.action {
-                                                            emptyType = .topic
-                                                            break
-                                                        }
-                                                    }
-                                                }
-                                                break loop
-                                            }
-                                        default:
-                                            break
-                                    }
-                                }
-                            }
-                            loadState = .empty(emptyType)
-                        }
-                    } else {
-                        if historyView.originalView.isLoadingEarlier && strongSelf.chatLocation.peerId?.namespace != Namespaces.Peer.CloudUser {
-                            loadState = .loading(true)
-                        } else {
-                            if historyView.filteredEntries.count == 1, let entry = historyView.filteredEntries.first, case .ChatInfoEntry = entry {
-                                loadState = .empty(.botInfo)
-                            } else {
-                                loadState = .messages
-                            }
-                        }
-                    }
+                if let historyView = strongSelf.historyView {
+                    loadState = loadStateForChatHistoryView(historyView, chatLocation: strongSelf.chatLocation, accountPeerId: strongSelf.context.account.peerId, alwaysHasMessages: alwaysHasMessages)
                 } else {
                     loadState = .loading(false)
                 }
@@ -4265,10 +4274,11 @@ public final class ChatHistoryListNodeImpl: ListViewImpl, ChatHistoryNode, ChatH
                     strongSelf._initialData.set(.single(ChatHistoryCombinedInitialData(initialData: transition.initialData, buttonKeyboardMessage: transition.keyboardButtonsMessage, cachedData: transition.cachedData, cachedDataMessages: transition.cachedDataMessages, readStateData: transition.readStateData)))
                 }
                 strongSelf._cachedPeerDataAndMessages.set(.single((transition.cachedData, transition.cachedDataMessages)))
-                let isEmpty = transition.historyView.originalView.entries.isEmpty || loadState == .empty(.botInfo)
+                let visibleMessageCount = visibleMessageCountForChatHistoryView(transition.historyView)
+                let isEmpty = visibleMessageCount == 0 || loadState == .empty(.botInfo)
                 var hasReachedLimits = false
                 if case let .customChatContents(customChatContents) = strongSelf.subject, let messageLimit = customChatContents.messageLimit {
-                    hasReachedLimits = transition.historyView.originalView.entries.count >= messageLimit
+                    hasReachedLimits = visibleMessageCount >= messageLimit
                 }
                 let historyState: ChatHistoryNodeHistoryState = .loaded(isEmpty: isEmpty, hasReachedLimits: hasReachedLimits)
                 if strongSelf.currentHistoryState != historyState {

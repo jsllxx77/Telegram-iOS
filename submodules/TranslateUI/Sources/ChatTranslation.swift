@@ -4,6 +4,8 @@ import SwiftSignalKit
 import TelegramCore
 import AccountContext
 import TelegramUIPreferences
+import Postbox
+import AyuGramCore
 
 public struct ChatTranslationState: Codable {
     enum CodingKeys: String, CodingKey {
@@ -139,6 +141,20 @@ public func updateChatTranslationStateInteractively(engine: TelegramEngine, peer
 private let languageRecognizer = NLLanguageRecognizer()
 
 public func translateMessageIds(context: AccountContext, messageIds: [EngineMessage.Id], fromLang: String?, toLang: String) -> Signal<Never, NoError> {
+    return ayuGramTranslationProvider(context: context)
+    |> mapToSignal { provider -> Signal<Never, NoError> in
+        switch provider {
+        case .telegram:
+            return translateMessageIdsWithTelegram(context: context, messageIds: messageIds, fromLang: fromLang, toLang: toLang, forceLocalIfPossible: false)
+        case .native:
+            return translateMessageIdsWithTelegram(context: context, messageIds: messageIds, fromLang: fromLang, toLang: toLang, forceLocalIfPossible: true)
+        case .google, .yandex:
+            return translateMessageIdsWithAlternativeProvider(context: context, messageIds: messageIds, fromLang: fromLang, toLang: toLang, provider: provider)
+        }
+    }
+}
+
+private func translateMessageIdsWithTelegram(context: AccountContext, messageIds: [EngineMessage.Id], fromLang: String?, toLang: String, forceLocalIfPossible: Bool) -> Signal<Never, NoError> {
     return context.account.postbox.transaction { transaction -> Signal<Never, NoError> in
         var messageIdsToTranslate: [EngineMessage.Id] = []
         var messageIdsSet = Set<EngineMessage.Id>()
@@ -187,7 +203,7 @@ public func translateMessageIds(context: AccountContext, messageIds: [EngineMess
         }
         
         let translationConfiguration = TranslationConfiguration.with(appConfiguration: context.currentAppConfiguration.with { $0 })
-        var enableLocalIfPossible = false
+        var enableLocalIfPossible = forceLocalIfPossible
         switch translationConfiguration.auto {
         case .system:
             if #available(iOS 18.0, *) {
@@ -201,6 +217,68 @@ public func translateMessageIds(context: AccountContext, messageIds: [EngineMess
             return .complete()
         }
     } |> switchToLatest
+}
+
+private func translateMessageIdsWithAlternativeProvider(context: AccountContext, messageIds: [EngineMessage.Id], fromLang: String?, toLang: String, provider: AyuTranslationProvider) -> Signal<Never, NoError> {
+    return context.account.postbox.transaction { transaction -> [(EngineMessage.Id, String)] in
+        var result: [(EngineMessage.Id, String)] = []
+        var messageIdsSet = Set<EngineMessage.Id>()
+        for messageId in messageIds {
+            guard let message = transaction.getMessage(messageId) else {
+                continue
+            }
+            if let replyAttribute = message.attributes.first(where: { $0 is ReplyMessageAttribute }) as? ReplyMessageAttribute, let replyMessage = message.associatedMessages[replyAttribute.messageId], !replyMessage.text.isEmpty {
+                let replyAlreadyTranslated = (replyMessage.attributes.first(where: { $0 is TranslationMessageAttribute }) as? TranslationMessageAttribute)?.toLang == toLang
+                if !replyAlreadyTranslated && !messageIdsSet.contains(replyMessage.id) {
+                    result.append((replyMessage.id, replyMessage.text))
+                    messageIdsSet.insert(replyMessage.id)
+                }
+            }
+            guard message.author?.id != context.account.peerId else {
+                continue
+            }
+            if let translation = message.attributes.first(where: { $0 is TranslationMessageAttribute }) as? TranslationMessageAttribute, translation.toLang == toLang {
+                continue
+            }
+            if !message.text.isEmpty && !messageIdsSet.contains(message.id) {
+                result.append((message.id, message.text))
+                messageIdsSet.insert(message.id)
+            }
+        }
+        return result
+    }
+    |> mapToSignal { messageTexts -> Signal<Never, NoError> in
+        if messageTexts.isEmpty {
+            return .complete()
+        }
+        let signals: [Signal<(EngineMessage.Id, (String, [MessageTextEntity])?), NoError>] = messageTexts.map { messageId, text in
+            return alternativeTranslateText(text: text, fromLang: fromLang, toLang: toLang, provider: provider)
+            |> map { result -> (EngineMessage.Id, (String, [MessageTextEntity])?) in
+                return (messageId, result)
+            }
+            |> `catch` { _ -> Signal<(EngineMessage.Id, (String, [MessageTextEntity])?), NoError> in
+                return .single((messageId, nil))
+            }
+        }
+        return combineLatest(signals)
+        |> mapToSignal { results -> Signal<Never, NoError> in
+            return context.account.postbox.transaction { transaction in
+                for (messageId, result) in results {
+                    guard let result, !result.0.isEmpty else {
+                        continue
+                    }
+                    let updatedAttribute = TranslationMessageAttribute(text: result.0, entities: result.1, toLang: toLang)
+                    transaction.updateMessage(messageId, update: { currentMessage in
+                        let storeForwardInfo = currentMessage.forwardInfo.flatMap(StoreMessageForwardInfo.init)
+                        var attributes = currentMessage.attributes.filter { !($0 is TranslationMessageAttribute) }
+                        attributes.append(updatedAttribute)
+                        return .update(StoreMessage(id: currentMessage.id, customStableId: nil, globallyUniqueId: currentMessage.globallyUniqueId, groupingKey: currentMessage.groupingKey, threadId: currentMessage.threadId, timestamp: currentMessage.timestamp, flags: StoreMessageFlags(currentMessage.flags), tags: currentMessage.tags, globalTags: currentMessage.globalTags, localTags: currentMessage.localTags, forwardInfo: storeForwardInfo, authorId: currentMessage.author?.id, text: currentMessage.text, attributes: attributes, media: currentMessage.media))
+                    })
+                }
+            }
+            |> ignoreValues
+        }
+    }
 }
 
 public func chatTranslationState(context: AccountContext, peerId: EnginePeer.Id, threadId: Int64?) -> Signal<ChatTranslationState?, NoError> {

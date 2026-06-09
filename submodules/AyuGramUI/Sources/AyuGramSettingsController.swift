@@ -13,13 +13,19 @@ import TelegramUIPreferences
 private final class AyuGramSettingsControllerArguments {
     let updateSettings: (@escaping (AyuGramSettings) -> AyuGramSettings) -> Void
     let openFilters: () -> Void
+    let presentationData: () -> PresentationData
+    let presentController: (ViewController, Any?) -> Void
 
     init(
         updateSettings: @escaping (@escaping (AyuGramSettings) -> AyuGramSettings) -> Void,
-        openFilters: @escaping () -> Void
+        openFilters: @escaping () -> Void,
+        presentationData: @escaping () -> PresentationData,
+        presentController: @escaping (ViewController, Any?) -> Void
     ) {
         self.updateSettings = updateSettings
         self.openFilters = openFilters
+        self.presentationData = presentationData
+        self.presentController = presentController
     }
 }
 
@@ -398,7 +404,9 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
         case .translationHeader:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: "TRANSLATION", sectionId: self.section)
         case let .translationProvider(value):
-            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "Translation Provider", label: stringForTranslationProvider(value), sectionId: self.section, style: .blocks, disclosureStyle: .none, action: nil)
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "Translation Provider", label: stringForTranslationProvider(value), sectionId: self.section, style: .blocks, disclosureStyle: .none, action: {
+                presentTranslationProviderSheet(presentationData: arguments.presentationData(), current: value, arguments: arguments)
+            })
 
         case .advancedHeader:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: "ADVANCED", sectionId: self.section)
@@ -545,12 +553,73 @@ private func stringForTranslationProvider(_ value: AyuTranslationProvider) -> St
     }
 }
 
+private func presentTranslationProviderSheet(presentationData: PresentationData, current: AyuTranslationProvider, arguments: AyuGramSettingsControllerArguments) {
+    let actionSheet = ActionSheetController(presentationData: presentationData)
+    let dismissAction: () -> Void = { [weak actionSheet] in
+        actionSheet?.dismissAnimated()
+    }
+    let selectProvider: (AyuTranslationProvider) -> Void = { provider in
+        let apply: () -> Void = {
+            arguments.updateSettings { settings in
+                var settings = settings
+                settings.translationProvider = provider
+                return settings
+            }
+        }
+        if provider == .google || provider == .yandex {
+            let warningSheet = ActionSheetController(presentationData: presentationData)
+            let dismissWarning: () -> Void = { [weak warningSheet] in
+                warningSheet?.dismissAnimated()
+            }
+            warningSheet.setItemGroups([
+                ActionSheetItemGroup(items: [
+                    ActionSheetTextItem(title: "\(stringForTranslationProvider(provider)) translations send text to a third-party service. Telegram cannot protect that text once it leaves Telegram."),
+                    ActionSheetButtonItem(title: "Use \(stringForTranslationProvider(provider))", color: .accent, action: {
+                        dismissWarning()
+                        apply()
+                    })
+                ]),
+                ActionSheetItemGroup(items: [
+                    ActionSheetButtonItem(title: presentationData.strings.Common_Cancel, color: .accent, font: .bold, action: {
+                        dismissWarning()
+                    })
+                ])
+            ])
+            arguments.presentController(warningSheet, ViewControllerPresentationArguments(presentationAnimation: .modalSheet))
+        } else {
+            apply()
+        }
+    }
+
+    let providers: [AyuTranslationProvider] = [.telegram, .google, .yandex, .native]
+    actionSheet.setItemGroups([
+        ActionSheetItemGroup(items: providers.map { provider in
+            ActionSheetButtonItem(title: current == provider ? "\(stringForTranslationProvider(provider)) (current)" : stringForTranslationProvider(provider), color: .accent, action: {
+                dismissAction()
+                selectProvider(provider)
+            })
+        }),
+        ActionSheetItemGroup(items: [
+            ActionSheetButtonItem(title: presentationData.strings.Common_Cancel, color: .accent, font: .bold, action: {
+                dismissAction()
+            })
+        ])
+    ])
+    arguments.presentController(actionSheet, ViewControllerPresentationArguments(presentationAnimation: .modalSheet))
+}
+
 public func ayuGramSettingsController(context: AccountContext) -> ViewController {
     var pushControllerImpl: ((ViewController) -> Void)?
+    var presentControllerImpl: ((ViewController, Any?) -> Void)?
+    let currentPresentationData = Atomic<PresentationData?>(value: nil)
     let arguments = AyuGramSettingsControllerArguments(updateSettings: { f in
         let _ = updateAyuGramSettingsInteractively(accountManager: context.sharedContext.accountManager, f).start()
     }, openFilters: {
         pushControllerImpl?(ayuGramFiltersController(context: context))
+    }, presentationData: {
+        return currentPresentationData.with { $0 } ?? context.sharedContext.currentPresentationData.with { $0 }
+    }, presentController: { controller, arguments in
+        presentControllerImpl?(controller, arguments)
     })
 
     let signal = combineLatest(
@@ -559,6 +628,7 @@ public func ayuGramSettingsController(context: AccountContext) -> ViewController
     )
     |> deliverOnMainQueue
     |> map { presentationData, sharedData -> (ItemListControllerState, (ItemListNodeState, Any)) in
+        let _ = currentPresentationData.swap(presentationData)
         let settings = ayuGramSettings(sharedData: sharedData)
 
         let controllerState = ItemListControllerState(
@@ -581,6 +651,9 @@ public func ayuGramSettingsController(context: AccountContext) -> ViewController
     let controller = ItemListController(context: context, state: signal)
     pushControllerImpl = { [weak controller] controllerToPush in
         (controller?.navigationController as? NavigationController)?.pushViewController(controllerToPush)
+    }
+    presentControllerImpl = { [weak controller] controllerToPresent, arguments in
+        controller?.present(controllerToPresent, in: .window(.root), with: arguments)
     }
     return controller
 }

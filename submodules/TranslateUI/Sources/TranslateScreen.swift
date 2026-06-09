@@ -27,6 +27,7 @@ import ContextUI
 import TranslationLanguagesContextMenuContent
 import TelegramUIPreferences
 import Markdown
+import AyuGramCore
 
 private let translateToTag = GenericComponentViewTag()
 
@@ -172,10 +173,28 @@ private final class SheetContent: CombinedComponent {
         }
         
         func translate(text: String, entities: [MessageTextEntity], fromLang: String?, toLang: String) -> Signal<(String, [MessageTextEntity])?, TranslationError> {
-            if self.useAlternativeTranslation {
-                return alternativeTranslateText(text: text, fromLang: fromLang, toLang: toLang)
-            } else {
-                return self.context.engine.messages.translate(text: text, toLang: toLang, entities: entities, tone: self.tone)
+            return ayuGramTranslationProvider(context: self.context)
+            |> castError(TranslationError.self)
+            |> mapToSignal { provider -> Signal<(String, [MessageTextEntity])?, TranslationError> in
+                let effectiveProvider: AyuTranslationProvider
+                if self.useAlternativeTranslation && provider == .telegram {
+                    effectiveProvider = .google
+                } else {
+                    effectiveProvider = provider
+                }
+                switch effectiveProvider {
+                case .google, .yandex:
+                    return alternativeTranslateText(text: text, fromLang: fromLang, toLang: toLang, provider: effectiveProvider)
+                case .telegram, .native:
+                    return self.context.engine.messages.translate(text: text, toLang: toLang, entities: entities, tone: self.tone)
+                    |> `catch` { error -> Signal<(String, [MessageTextEntity])?, TranslationError> in
+                        if case .tryAlternative = error {
+                            return alternativeTranslateText(text: text, fromLang: fromLang, toLang: toLang, provider: .google)
+                        } else {
+                            return .fail(error)
+                        }
+                    }
+                }
             }
         }
         

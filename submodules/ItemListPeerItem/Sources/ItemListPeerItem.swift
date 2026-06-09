@@ -330,6 +330,7 @@ public final class ItemListPeerItem: ListViewItem, ItemListItem {
             public let animationCache: AnimationCache
             public let animationRenderer: MultiAnimationRenderer
             public let isPremiumDisabled: Bool
+            public let isAyuGramPremiumStatusHidden: Bool
             public let resolveInlineStickers: ([Int64]) -> Signal<[Int64: TelegramMediaFile], NoError>
 
             public init(
@@ -338,6 +339,7 @@ public final class ItemListPeerItem: ListViewItem, ItemListItem {
                 animationCache: AnimationCache,
                 animationRenderer: MultiAnimationRenderer,
                 isPremiumDisabled: Bool,
+                isAyuGramPremiumStatusHidden: Bool = false,
                 resolveInlineStickers: @escaping ([Int64]) -> Signal<[Int64: TelegramMediaFile], NoError>
             ) {
                 self.accountPeerId = accountPeerId
@@ -345,6 +347,7 @@ public final class ItemListPeerItem: ListViewItem, ItemListItem {
                 self.animationCache = animationCache
                 self.animationRenderer = animationRenderer
                 self.isPremiumDisabled = isPremiumDisabled
+                self.isAyuGramPremiumStatusHidden = isAyuGramPremiumStatusHidden
                 self.resolveInlineStickers = resolveInlineStickers
             }
         }
@@ -397,6 +400,15 @@ public final class ItemListPeerItem: ListViewItem, ItemListItem {
             }
         }
         
+        public var isAyuGramPremiumStatusHidden: Bool {
+            switch self {
+            case let .account(context):
+                return context.isAyuGramPremiumStatusHidden
+            case let .custom(custom):
+                return custom.isAyuGramPremiumStatusHidden
+            }
+        }
+
         public var resolveInlineStickers: ([Int64]) -> Signal<[Int64: TelegramMediaFile], NoError> {
             switch self {
             case let .account(context):
@@ -934,7 +946,7 @@ public class ItemListPeerItemNode: ItemListRevealOptionsItemNode, ItemListItemNo
                     if let color = emojiStatus.color {
                         credibilityParticleColor = UIColor(rgb: UInt32(bitPattern: color))
                     }
-                } else if item.peer.isPremium && !item.context.isPremiumDisabled {
+                } else if item.peer.isPremium && !item.context.isPremiumDisabled && !item.context.isAyuGramPremiumStatusHidden {
                     credibilityIcon = .premium(color: item.presentationData.theme.list.itemAccentColor)
                 }
                 

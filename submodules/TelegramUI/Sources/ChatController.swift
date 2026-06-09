@@ -6602,7 +6602,14 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
 
         self.ayuGramSettingsDisposable = (context.sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.ayuGramSettings])
         |> deliverOnMainQueue).startStrict(next: { [weak self] sharedData in
-            self?.ayuGramSettingsValue.swap(ayuGramSettings(sharedData: sharedData))
+            guard let self else {
+                return
+            }
+            let settings = ayuGramSettings(sharedData: sharedData)
+            let previousSettings = self.ayuGramSettingsValue.swap(settings)
+            if previousSettings.hidePremiumStatuses != settings.hidePremiumStatuses && self.isNodeLoaded {
+                self.updateChatPresentationInterfaceState(animated: false, interactive: false, { $0 })
+            }
         })
         
         self.stickerSettingsDisposable = combineLatest(queue: Queue.mainQueue(),

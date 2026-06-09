@@ -172,6 +172,8 @@ public final class AccountContextImpl: AccountContext {
     private var ayuGramUploadProgressPolicyDisposable: Disposable?
     private var ayuGramPresencePolicyDisposable: Disposable?
     private var ayuGramMessageHistoryPolicyDisposable: Disposable?
+    private var ayuGramDisplaySettingsDisposable: Disposable?
+    public private(set) var isAyuGramPremiumStatusHidden: Bool = false
     
     public let cachedGroupCallContexts: AccountGroupCallContextCache
     
@@ -544,6 +546,16 @@ public final class AccountContextImpl: AccountContext {
         |> distinctUntilChanged).start(next: { value in
             account.updateAccountMessageHistoryPolicy(.single(value))
         })
+
+        self.ayuGramDisplaySettingsDisposable = (sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.ayuGramSettings])
+        |> map { sharedData -> Bool in
+            let settings = ayuGramSettings(sharedData: sharedData)
+            return settings.hidePremiumStatuses
+        }
+        |> distinctUntilChanged
+        |> deliverOnMainQueue).start(next: { [weak self] value in
+            self?.isAyuGramPremiumStatusHidden = value
+        })
     }
     
     deinit {
@@ -556,6 +568,7 @@ public final class AccountContextImpl: AccountContext {
         self.ayuGramUploadProgressPolicyDisposable?.dispose()
         self.ayuGramPresencePolicyDisposable?.dispose()
         self.ayuGramMessageHistoryPolicyDisposable?.dispose()
+        self.ayuGramDisplaySettingsDisposable?.dispose()
         self.animatedEmojiStickersDisposable?.dispose()
         self.userLimitsConfigurationDisposable?.dispose()
         self.peerNameColorsConfigurationDisposable?.dispose()

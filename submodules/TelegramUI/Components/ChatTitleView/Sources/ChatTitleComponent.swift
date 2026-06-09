@@ -25,8 +25,9 @@ public final class ChatNavigationBarTitleView: UIView, NavigationBarTitleView {
         let dateTimeFormat: PresentationDateTimeFormat
         let nameDisplayOrder: PresentationPersonNameOrder
         let content: ChatTitleContent
+        let hidePremiumStatus: Bool
         
-        init(context: AccountContext, theme: PresentationTheme, preferClearGlass: Bool, wallpaper: TelegramWallpaper, strings: PresentationStrings, dateTimeFormat: PresentationDateTimeFormat, nameDisplayOrder: PresentationPersonNameOrder, content: ChatTitleContent) {
+        init(context: AccountContext, theme: PresentationTheme, preferClearGlass: Bool, wallpaper: TelegramWallpaper, strings: PresentationStrings, dateTimeFormat: PresentationDateTimeFormat, nameDisplayOrder: PresentationPersonNameOrder, content: ChatTitleContent, hidePremiumStatus: Bool) {
             self.context = context
             self.theme = theme
             self.preferClearGlass = preferClearGlass
@@ -35,6 +36,7 @@ public final class ChatNavigationBarTitleView: UIView, NavigationBarTitleView {
             self.dateTimeFormat = dateTimeFormat
             self.nameDisplayOrder = nameDisplayOrder
             self.content = content
+            self.hidePremiumStatus = hidePremiumStatus
         }
         
         static func ==(lhs: ContentData, rhs: ContentData) -> Bool {
@@ -60,6 +62,9 @@ public final class ChatNavigationBarTitleView: UIView, NavigationBarTitleView {
                 return false
             }
             if lhs.content != rhs.content {
+                return false
+            }
+            if lhs.hidePremiumStatus != rhs.hidePremiumStatus {
                 return false
             }
             return true
@@ -112,6 +117,7 @@ public final class ChatNavigationBarTitleView: UIView, NavigationBarTitleView {
         dateTimeFormat: PresentationDateTimeFormat,
         nameDisplayOrder: PresentationPersonNameOrder,
         content: ChatTitleContent,
+        hidePremiumStatus: Bool = false,
         transition: ComponentTransition,
         ignoreParentTransitionRequests: Bool = false
     ) -> Bool {
@@ -124,7 +130,8 @@ public final class ChatNavigationBarTitleView: UIView, NavigationBarTitleView {
             strings: strings,
             dateTimeFormat: dateTimeFormat,
             nameDisplayOrder: nameDisplayOrder,
-            content: content
+            content: content,
+            hidePremiumStatus: hidePremiumStatus
         )
         let isUpdated = self.contentData != contentData
         self.contentData = contentData
@@ -171,6 +178,7 @@ public final class ChatNavigationBarTitleView: UIView, NavigationBarTitleView {
                     nameDisplayOrder: contentData.nameDisplayOrder,
                     displayBackground: displayBackground,
                     content: contentData.content,
+                    hidePremiumStatus: contentData.hidePremiumStatus,
                     activities: self.activities,
                     networkState: self.networkState,
                     tapped: { [weak self] in
@@ -238,6 +246,7 @@ public final class ChatTitleComponent: Component {
     public let nameDisplayOrder: PresentationPersonNameOrder
     public let displayBackground: Bool
     public let content: ChatTitleContent
+    public let hidePremiumStatus: Bool
     public let activities: Activities?
     public let networkState: AccountNetworkState?
     public let tapped: () -> Void
@@ -252,6 +261,7 @@ public final class ChatTitleComponent: Component {
         nameDisplayOrder: PresentationPersonNameOrder,
         displayBackground: Bool,
         content: ChatTitleContent,
+        hidePremiumStatus: Bool = false,
         activities: Activities?,
         networkState: AccountNetworkState?,
         tapped: @escaping () -> Void,
@@ -265,6 +275,7 @@ public final class ChatTitleComponent: Component {
         self.nameDisplayOrder = nameDisplayOrder
         self.displayBackground = displayBackground
         self.content = content
+        self.hidePremiumStatus = hidePremiumStatus
         self.activities = activities
         self.networkState = networkState
         self.tapped = tapped
@@ -294,6 +305,9 @@ public final class ChatTitleComponent: Component {
             return false
         }
         if lhs.content != rhs.content {
+            return false
+        }
+        if lhs.hidePremiumStatus != rhs.hidePremiumStatus {
             return false
         }
         if lhs.activities != rhs.activities {
@@ -450,7 +464,7 @@ public final class ChatTitleComponent: Component {
                                 titleCredibilityIcon = .scam
                             } else if !hidePeerStatus, let emojiStatus = peer.emojiStatus {
                                 titleStatusIcon = .emojiStatus(emojiStatus)
-                            } else if peer.isPremium && !premiumConfiguration.isPremiumDisabled {
+                            } else if peer.isPremium && !premiumConfiguration.isPremiumDisabled && !component.hidePremiumStatus {
                                 titleCredibilityIcon = .premium
                             }
                             

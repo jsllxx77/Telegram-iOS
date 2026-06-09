@@ -1672,6 +1672,7 @@ public protocol AccountContext: AnyObject {
     
     var isPremium: Bool { get }
     var isFrozen: Bool { get }
+    var isAyuGramPremiumStatusHidden: Bool { get }
     var userLimits: EngineConfiguration.UserLimits { get }
     var peerNameColors: PeerNameColors { get }
     

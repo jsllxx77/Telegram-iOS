@@ -472,6 +472,7 @@ func updateChatPresentationInterfaceStateImpl(
             dateTimeFormat: selfController.presentationData.dateTimeFormat,
             nameDisplayOrder: selfController.presentationData.nameDisplayOrder,
             content: chatTitleContent,
+            hidePremiumStatus: selfController.ayuGramSettingsValue.with { $0.hidePremiumStatuses },
             transition: titleTransition,
             ignoreParentTransitionRequests: true
         )

@@ -7,6 +7,7 @@ import Display
 import TelegramCore
 import TelegramPresentationData
 import TelegramUIPreferences
+import AyuGramCore
 import TelegramBaseController
 import OverlayStatusController
 import AccountContext
@@ -126,6 +127,7 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
     
     private var badgeDisposable: Disposable?
     private var badgeIconDisposable: Disposable?
+    private var ayuGramSettings: AyuGramSettings = .defaultSettings
     
     private var didAppear = false
     private var dismissSearchOnDisappear = false
@@ -433,9 +435,15 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
             }
         }
         
-        self.badgeDisposable = (combineLatest(renderedTotalUnreadCount(accountManager: context.sharedContext.accountManager, engine: context.engine), self.presentationDataValue.get()) |> deliverOnMainQueue).startStrict(next: { [weak self] count, presentationData in
+        let ayuGramSettingsSignal = context.sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.ayuGramSettings])
+        |> map { sharedData -> AyuGramSettings in
+            return ayuGramSettings(sharedData: sharedData)
+        }
+
+        self.badgeDisposable = (combineLatest(renderedTotalUnreadCount(accountManager: context.sharedContext.accountManager, engine: context.engine), self.presentationDataValue.get(), ayuGramSettingsSignal) |> deliverOnMainQueue).startStrict(next: { [weak self] count, presentationData, ayuGramSettings in
             if let strongSelf = self {
-                if count.0 == 0 {
+                strongSelf.ayuGramSettings = ayuGramSettings
+                if ayuGramSettings.hideNotificationBadge || count.0 == 0 {
                     strongSelf.tabBarItem.badgeValue = ""
                 } else {
                     strongSelf.tabBarItem.badgeValue = compactNumericCountString(Int(count.0), decimalSeparator: presentationData.dateTimeFormat.decimalSeparator)
@@ -3932,29 +3940,47 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
         self.filterDisposable.set((combineLatest(queue: .mainQueue(),
             filterItems,
             self.context.account.postbox.peerView(id: self.context.account.peerId),
-            self.context.engine.data.get(TelegramEngine.EngineData.Item.Configuration.UserLimits(isPremium: false))
+            self.context.engine.data.get(TelegramEngine.EngineData.Item.Configuration.UserLimits(isPremium: false)),
+            self.context.sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.ayuGramSettings])
+            |> map { sharedData -> AyuGramSettings in
+                return ayuGramSettings(sharedData: sharedData)
+            }
         )
-        |> deliverOnMainQueue).startStrict(next: { [weak self] countAndFilterItems, peerView, limits in
+        |> deliverOnMainQueue).startStrict(next: { [weak self] countAndFilterItems, peerView, limits, ayuGramSettings in
             guard let strongSelf = self else {
                 return
             }
+            strongSelf.ayuGramSettings = ayuGramSettings
             
             let isPremium = peerView.peers[peerView.peerId]?.isPremium
             strongSelf.isPremium = isPremium ?? false
             
             let (_, items) = countAndFilterItems
             var filterItems: [ChatListFilterTabEntry] = []
+            let hasFolderFilters = items.contains(where: { item in
+                if case .filter = item.0 {
+                    return true
+                } else {
+                    return false
+                }
+            })
+            let hideAllChatsFolder = ayuGramSettings.hideAllChatsFolder && hasFolderFilters
             
             for (filter, unreadCount, hasUnmutedUnread) in items {
                 switch filter {
                     case .allChats:
+                        if hideAllChatsFolder {
+                            break
+                        }
                         if let isPremium = isPremium, !isPremium && filterItems.count > 0 {
                             filterItems.insert(.all(unreadCount: 0), at: 0)
                         } else {
                             filterItems.append(.all(unreadCount: 0))
                         }
                     case let .filter(id, title, _, _):
-                        filterItems.append(.filter(id: id, text: title, unread: ChatListFilterTabEntryUnreadCount(value: unreadCount, hasUnmuted: hasUnmutedUnread)))
+                        let effectiveUnreadCount = ayuGramSettings.hideNotificationCounters ? 0 : unreadCount
+                        let effectiveHasUnmutedUnread = ayuGramSettings.hideNotificationCounters ? false : hasUnmutedUnread
+                        filterItems.append(.filter(id: id, text: title, unread: ChatListFilterTabEntryUnreadCount(value: effectiveUnreadCount, hasUnmuted: effectiveHasUnmutedUnread)))
                 }
             }
             
@@ -3968,7 +3994,7 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
             let firstItemEntryId: ChatListFilterTabEntryId
             switch firstItem {
                 case .allChats:
-                    firstItemEntryId = .all
+                    firstItemEntryId = resolvedItems.first?.id ?? .all
                 case let .filter(id, _, _, _):
                     firstItemEntryId = .filter(id)
             }
@@ -3989,10 +4015,10 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
                         }
                     }
                     if !found {
-                        selectedEntryId = .all
+                        selectedEntryId = resolvedItems.first?.id ?? .all
                     }
                 } else {
-                    selectedEntryId = .all
+                    selectedEntryId = resolvedItems.first?.id ?? .all
                 }
             }
             let filtersLimit = isPremium == false ? limits.maxFoldersCount : nil
@@ -4003,6 +4029,9 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
                 switch item.0 {
                     case .allChats:
                         hasAllChats = true
+                        if hideAllChatsFolder {
+                            break
+                        }
                         if let isPremium = isPremium, !isPremium && availableFilters.count > 0 {
                             availableFilters.insert(.all, at: 0)
                         } else {
@@ -4012,7 +4041,7 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
                         availableFilters.append(.filter(item.0))
                 }
             }
-            if !hasAllChats {
+            if !hasAllChats || availableFilters.isEmpty {
                 availableFilters.insert(.all, at: 0)
             }
             strongSelf.chatListDisplayNode.mainContainerNode.updateAvailableFilters(availableFilters, limit: filtersLimit)
@@ -6213,9 +6242,11 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
                         isDisabled = true
                     }
                     
-                    for item in filterItems {
-                        if item.0.id == id && item.1 != 0 {
-                            badge = ContextMenuActionBadge(value: "\(item.1)", color: item.2 ? .accent : .inactive)
+                    if !strongSelf.ayuGramSettings.hideNotificationCounters {
+                        for item in filterItems {
+                            if item.0.id == id && item.1 != 0 {
+                                badge = ContextMenuActionBadge(value: "\(item.1)", color: item.2 ? .accent : .inactive)
+                            }
                         }
                     }
                     items.append(.action(ContextMenuActionItem(text: title.text, entities: title.entities, enableEntityAnimations: title.enableAnimations, badge: badge, icon: { theme in

@@ -63,6 +63,10 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
     case disableOpenLinkWarning(Bool)
     case disableAds(Bool)
     case disableStories(Bool)
+    case hidePremiumStatuses(Bool)
+    case hideNotificationCounters(Bool)
+    case hideNotificationBadge(Bool)
+    case hideAllChatsFolder(Bool)
 
     case translationHeader
     case translationProvider(AyuTranslationProvider)
@@ -80,7 +84,7 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return AyuGramSettingsSection.filters.rawValue
         case .appearanceHeader, .semiTransparentDeletedMessages, .messageBubbleRadius, .avatarCorners, .singleCornerRadius, .removeMessageTail, .replaceBottomInfoWithIcons:
             return AyuGramSettingsSection.appearance.rawValue
-        case .chatControlsHeader, .hideFastShare, .showPeerId, .showMessageSeconds, .hideSimilarChannels, .disableOpenLinkWarning, .disableAds, .disableStories:
+        case .chatControlsHeader, .hideFastShare, .showPeerId, .showMessageSeconds, .hideSimilarChannels, .disableOpenLinkWarning, .disableAds, .disableStories, .hidePremiumStatuses, .hideNotificationCounters, .hideNotificationBadge, .hideAllChatsFolder:
             return AyuGramSettingsSection.chatControls.rawValue
         case .translationHeader, .translationProvider:
             return AyuGramSettingsSection.translation.rawValue
@@ -141,6 +145,14 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return 406
         case .disableStories:
             return 407
+        case .hidePremiumStatuses:
+            return 408
+        case .hideNotificationCounters:
+            return 409
+        case .hideNotificationBadge:
+            return 410
+        case .hideAllChatsFolder:
+            return 411
         case .translationHeader:
             return 500
         case .translationProvider:
@@ -239,6 +251,14 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return ayuGramSwitchItem(presentationData: presentationData, title: "Disable Ads", value: value, section: self.section, arguments: arguments, keyPath: \.disableAds)
         case let .disableStories(value):
             return ayuGramSwitchItem(presentationData: presentationData, title: "Disable Stories", value: value, section: self.section, arguments: arguments, keyPath: \.disableStories)
+        case let .hidePremiumStatuses(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "Hide Premium Statuses", value: value, section: self.section, arguments: arguments, keyPath: \.hidePremiumStatuses)
+        case let .hideNotificationCounters(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "Hide Notification Counters", value: value, section: self.section, arguments: arguments, keyPath: \.hideNotificationCounters)
+        case let .hideNotificationBadge(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "Hide Notification Badge", value: value, section: self.section, arguments: arguments, keyPath: \.hideNotificationBadge)
+        case let .hideAllChatsFolder(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "Hide All Chats Folder", value: value, section: self.section, arguments: arguments, keyPath: \.hideAllChatsFolder)
 
         case .translationHeader:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: "TRANSLATION", sectionId: self.section)
@@ -304,6 +324,10 @@ private func ayuGramSettingsControllerEntries(settings: AyuGramSettings) -> [Ayu
     entries.append(.disableOpenLinkWarning(settings.disableOpenLinkWarning))
     entries.append(.disableAds(settings.disableAds))
     entries.append(.disableStories(settings.disableStories))
+    entries.append(.hidePremiumStatuses(settings.hidePremiumStatuses))
+    entries.append(.hideNotificationCounters(settings.hideNotificationCounters))
+    entries.append(.hideNotificationBadge(settings.hideNotificationBadge))
+    entries.append(.hideAllChatsFolder(settings.hideAllChatsFolder))
 
     entries.append(.translationHeader)
     entries.append(.translationProvider(settings.translationProvider))

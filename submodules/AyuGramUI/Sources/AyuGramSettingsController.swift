@@ -31,6 +31,7 @@ private enum AyuGramSettingsSection: Int32 {
 private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
     case ghostModeHeader
     case useGlobalGhostMode(Bool)
+    case globalSendReadMessages(Bool)
 
     case messageHistoryHeader
     case saveDeletedMessages(Bool)
@@ -56,7 +57,7 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
 
     var section: ItemListSectionId {
         switch self {
-        case .ghostModeHeader, .useGlobalGhostMode:
+        case .ghostModeHeader, .useGlobalGhostMode, .globalSendReadMessages:
             return AyuGramSettingsSection.ghostMode.rawValue
         case .messageHistoryHeader, .saveDeletedMessages, .saveMessagesHistory:
             return AyuGramSettingsSection.messageHistory.rawValue
@@ -79,6 +80,8 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return 0
         case .useGlobalGhostMode:
             return 1
+        case .globalSendReadMessages:
+            return 2
         case .messageHistoryHeader:
             return 100
         case .saveDeletedMessages:
@@ -125,6 +128,14 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return ItemListSectionHeaderItem(presentationData: presentationData, text: "GHOST MODE", sectionId: self.section)
         case let .useGlobalGhostMode(value):
             return ayuGramSwitchItem(presentationData: presentationData, title: "Use Global Ghost Mode", value: value, section: self.section, arguments: arguments, keyPath: \.useGlobalGhostMode)
+        case let .globalSendReadMessages(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Send Read Messages", value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.updateSettings { settings in
+                    var settings = settings
+                    settings.globalGhostSettings.sendReadMessages = value
+                    return settings
+                }
+            })
 
         case .messageHistoryHeader:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: "MESSAGE HISTORY", sectionId: self.section)
@@ -189,6 +200,9 @@ private func ayuGramSettingsControllerEntries(settings: AyuGramSettings) -> [Ayu
 
     entries.append(.ghostModeHeader)
     entries.append(.useGlobalGhostMode(settings.useGlobalGhostMode))
+    if settings.useGlobalGhostMode {
+        entries.append(.globalSendReadMessages(settings.globalGhostSettings.sendReadMessages))
+    }
 
     entries.append(.messageHistoryHeader)
     entries.append(.saveDeletedMessages(settings.saveDeletedMessages))

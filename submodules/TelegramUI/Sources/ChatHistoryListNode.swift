@@ -2490,7 +2490,7 @@ public final class ChatHistoryListNodeImpl: ListViewImpl, ChatHistoryNode, ChatH
         let ayuGramGhostPolicy = self.context.sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.ayuGramSettings])
         |> map { sharedData -> AyuGramGhostPolicy in
             let settings = ayuGramSettings(sharedData: sharedData)
-            let ghostSettings = settings.useGlobalGhostMode ? AyuGramGhostSettings.defaultSettings : (settings.ghostAccounts[accountId] ?? AyuGramGhostSettings.defaultSettings)
+            let ghostSettings = settings.useGlobalGhostMode ? settings.globalGhostSettings : (settings.ghostAccounts[accountId] ?? AyuGramGhostSettings.defaultSettings)
             return AyuGramGhostPolicy(sendReadMessages: ghostSettings.sendReadMessages && !ghostSettings.sendReadMessagesLocked)
         }
         let readHistory = combineLatest(self.maxVisibleIncomingMessageIndex.get(), self.canReadHistory.get(), ayuGramGhostPolicy)

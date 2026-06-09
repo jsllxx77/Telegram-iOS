@@ -224,6 +224,7 @@ public struct AyuGramSettings: Codable, Equatable {
     public var avatarCorners: Int32
     public var singleCornerRadius: Bool
     public var useGlobalGhostMode: Bool
+    public var globalGhostSettings: AyuGramGhostSettings
     public var ghostAccounts: [Int64: AyuGramGhostSettings]
     public var messageShotSettings: AyuGramMessageShotSettings
 
@@ -315,6 +316,7 @@ public struct AyuGramSettings: Codable, Equatable {
         avatarCorners: Int32 = 23,
         singleCornerRadius: Bool = false,
         useGlobalGhostMode: Bool = true,
+        globalGhostSettings: AyuGramGhostSettings = .defaultSettings,
         ghostAccounts: [Int64: AyuGramGhostSettings] = [:],
         messageShotSettings: AyuGramMessageShotSettings = .defaultSettings
     ) {
@@ -403,6 +405,7 @@ public struct AyuGramSettings: Codable, Equatable {
         self.avatarCorners = avatarCorners
         self.singleCornerRadius = singleCornerRadius
         self.useGlobalGhostMode = useGlobalGhostMode
+        self.globalGhostSettings = globalGhostSettings
         self.ghostAccounts = ghostAccounts
         self.messageShotSettings = messageShotSettings
     }
@@ -493,6 +496,7 @@ public struct AyuGramSettings: Codable, Equatable {
         case avatarCorners
         case singleCornerRadius
         case useGlobalGhostMode
+        case globalGhostSettings
         case ghostAccounts
         case messageShotSettings
     }
@@ -586,6 +590,7 @@ public struct AyuGramSettings: Codable, Equatable {
         self.avatarCorners = container.decodeIfPresent(Int32.self, forKey: .avatarCorners, fallback: defaults.avatarCorners)
         self.singleCornerRadius = container.decodeIfPresent(Bool.self, forKey: .singleCornerRadius, fallback: defaults.singleCornerRadius)
         self.useGlobalGhostMode = container.decodeIfPresent(Bool.self, forKey: .useGlobalGhostMode, fallback: defaults.useGlobalGhostMode)
+        self.globalGhostSettings = container.decodeIfPresent(AyuGramGhostSettings.self, forKey: .globalGhostSettings, fallback: defaults.globalGhostSettings)
         if let ghostAccountEntries = try? container.decodeIfPresent([AyuGramGhostAccountSettingsEntry].self, forKey: .ghostAccounts) {
             var ghostAccounts: [Int64: AyuGramGhostSettings] = [:]
             for entry in ghostAccountEntries {
@@ -686,6 +691,7 @@ public struct AyuGramSettings: Codable, Equatable {
         try container.encode(self.avatarCorners, forKey: .avatarCorners)
         try container.encode(self.singleCornerRadius, forKey: .singleCornerRadius)
         try container.encode(self.useGlobalGhostMode, forKey: .useGlobalGhostMode)
+        try container.encode(self.globalGhostSettings, forKey: .globalGhostSettings)
         let ghostAccountEntries = self.ghostAccounts.keys.sorted().map { accountId in
             AyuGramGhostAccountSettingsEntry(
                 accountId: accountId,

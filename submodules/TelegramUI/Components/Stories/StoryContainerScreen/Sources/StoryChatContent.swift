@@ -4,10 +4,36 @@ import Display
 import ComponentFlow
 import SwiftSignalKit
 import AccountContext
+import AyuGramCore
 import TelegramCore
+import TelegramUIPreferences
 import Postbox
 import MediaResources
 import RangeSet
+
+private func ayuGramShouldSendStoryRead(context: AccountContext) -> Signal<Bool, NoError> {
+    let accountId = context.account.peerId.id._internalGetInt64Value()
+    return context.sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.ayuGramSettings])
+    |> take(1)
+    |> map { sharedData -> Bool in
+        let settings = ayuGramSettings(sharedData: sharedData)
+        let ghostSettings = settings.useGlobalGhostMode ? settings.globalGhostSettings : (settings.ghostAccounts[accountId] ?? AyuGramGhostSettings.defaultSettings)
+        return ghostSettings.sendReadStories && !ghostSettings.sendReadStoriesLocked
+    }
+}
+
+private func ayuGramMarkStoryAsSeenIfAllowed(context: AccountContext, id: StoryId, asPinned: Bool) {
+    if context.sharedContext.immediateExperimentalUISettings.skipReadHistory {
+        return
+    }
+
+    let _ = (ayuGramShouldSendStoryRead(context: context)
+    |> deliverOnMainQueue).startStandalone(next: { shouldSendStoryRead in
+        if shouldSendStoryRead {
+            let _ = context.engine.messages.markStoryAsSeen(peerId: id.peerId, id: id.id, asPinned: asPinned).startStandalone()
+        }
+    })
+}
 
 private struct StoryKey: Hashable {
     var peerId: EnginePeer.Id
@@ -1130,9 +1156,7 @@ public final class StoryContentContextImpl: StoryContentContext {
     }
     
     public func markAsSeen(id: StoryId) {
-        if !self.context.sharedContext.immediateExperimentalUISettings.skipReadHistory {
-            let _ = self.context.engine.messages.markStoryAsSeen(peerId: id.peerId, id: id.id, asPinned: false).startStandalone()
-        }
+        ayuGramMarkStoryAsSeenIfAllowed(context: self.context, id: id, asPinned: false)
     }
 }
 
@@ -1432,9 +1456,7 @@ public final class SingleStoryContentContextImpl: StoryContentContext {
     
     public func markAsSeen(id: StoryId) {
         if self.readGlobally {
-            if !self.context.sharedContext.immediateExperimentalUISettings.skipReadHistory {
-                let _ = self.context.engine.messages.markStoryAsSeen(peerId: id.peerId, id: id.id, asPinned: false).startStandalone()
-            }
+            ayuGramMarkStoryAsSeenIfAllowed(context: self.context, id: id, asPinned: false)
         }
     }
 }
@@ -1830,9 +1852,7 @@ public final class PeerStoryListContentContextImpl: StoryContentContext {
     }
     
     public func markAsSeen(id: StoryId) {
-        if !self.context.sharedContext.immediateExperimentalUISettings.skipReadHistory {
-            let _ = self.context.engine.messages.markStoryAsSeen(peerId: id.peerId, id: id.id, asPinned: true).startStandalone()
-        }
+        ayuGramMarkStoryAsSeenIfAllowed(context: self.context, id: id, asPinned: true)
     }
 }
 
@@ -3094,8 +3114,6 @@ public final class RepostStoriesContentContextImpl: StoryContentContext {
     }
     
     public func markAsSeen(id: StoryId) {
-        if !self.context.sharedContext.immediateExperimentalUISettings.skipReadHistory {
-            let _ = self.context.engine.messages.markStoryAsSeen(peerId: id.peerId, id: id.id, asPinned: false).startStandalone()
-        }
+        ayuGramMarkStoryAsSeenIfAllowed(context: self.context, id: id, asPinned: false)
     }
 }

@@ -3918,6 +3918,32 @@ private func ayuGramMediaSummary(from message: Message) -> String? {
         .joined(separator: ",")
 }
 
+private func ayuGramMessageSnapshot(
+    accountPeerId: PeerId,
+    message: Message,
+    editTimestamp: Int32?
+) -> AyuGramMessageSnapshot {
+    let views = (message.attributes.first(where: { $0 is ViewCountMessageAttribute }) as? ViewCountMessageAttribute)?.count
+
+    return AyuGramMessageSnapshot(
+        accountPeerId: accountPeerId.toInt64(),
+        peerId: message.id.peerId.toInt64(),
+        threadId: message.threadId,
+        messageNamespace: message.id.namespace,
+        messageId: message.id.id,
+        stableId: Int64(message.stableId),
+        authorPeerId: message.author?.id.toInt64(),
+        timestamp: message.timestamp,
+        editTimestamp: editTimestamp,
+        text: message.text,
+        entitiesData: ayuGramEncodedEntitiesData(from: message),
+        views: views.map { Int32(clamping: $0) },
+        forwardInfoData: nil,
+        mediaSummary: ayuGramMediaSummary(from: message),
+        createdAt: Int32(CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970)
+    )
+}
+
 private func storeAyuGramEditedMessageSnapshot(
     policy: AccountMessageHistoryPolicy,
     accountPeerId: PeerId,
@@ -3945,29 +3971,45 @@ private func storeAyuGramEditedMessageSnapshot(
         return
     }
 
-    let views = (previousMessage.attributes.first(where: { $0 is ViewCountMessageAttribute }) as? ViewCountMessageAttribute)?.count
     let editedTimestamp = (updatedMessage.attributes.first(where: { $0 is EditedMessageAttribute }) as? EditedMessageAttribute)?.date
-    let snapshot = AyuGramMessageSnapshot(
-        accountPeerId: accountPeerId.toInt64(),
-        peerId: previousMessage.id.peerId.toInt64(),
-        threadId: previousMessage.threadId,
-        messageNamespace: previousMessage.id.namespace,
-        messageId: previousMessage.id.id,
-        stableId: Int64(previousMessage.stableId),
-        authorPeerId: previousMessage.author?.id.toInt64(),
-        timestamp: previousMessage.timestamp,
-        editTimestamp: editedTimestamp,
-        text: previousMessage.text,
-        entitiesData: ayuGramEncodedEntitiesData(from: previousMessage),
-        views: views.map { Int32(clamping: $0) },
-        forwardInfoData: nil,
-        mediaSummary: ayuGramMediaSummary(from: previousMessage),
-        createdAt: Int32(CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970)
-    )
+    let snapshot = ayuGramMessageSnapshot(accountPeerId: accountPeerId, message: previousMessage, editTimestamp: editedTimestamp)
 
     transaction.updatePreferencesEntry(key: PreferencesKeys.ayuGramMessageHistoryStore(), { current in
         var store = current?.get(AyuGramMessageHistoryStore.self) ?? .empty
         store.addEditedSnapshot(snapshot)
+        return PreferencesEntry(store)
+    })
+}
+
+private func storeAyuGramDeletedMessageSnapshots(
+    policy: AccountMessageHistoryPolicy,
+    accountPeerId: PeerId,
+    messages: [Message],
+    transaction: Transaction
+) {
+    guard policy.saveDeletedMessages else {
+        return
+    }
+
+    var snapshots: [AyuGramMessageSnapshot] = []
+    for message in messages {
+        if !policy.saveForBots, let author = message.author as? TelegramUser, author.botInfo != nil {
+            continue
+        }
+
+        let editTimestamp = (message.attributes.first(where: { $0 is EditedMessageAttribute }) as? EditedMessageAttribute)?.date
+        snapshots.append(ayuGramMessageSnapshot(accountPeerId: accountPeerId, message: message, editTimestamp: editTimestamp))
+    }
+
+    if snapshots.isEmpty {
+        return
+    }
+
+    transaction.updatePreferencesEntry(key: PreferencesKeys.ayuGramMessageHistoryStore(), { current in
+        var store = current?.get(AyuGramMessageHistoryStore.self) ?? .empty
+        for snapshot in snapshots {
+            store.addDeletedSnapshot(snapshot)
+        }
         return PreferencesEntry(store)
     })
 }
@@ -4508,6 +4550,13 @@ func replayFinalState(
                     }
                 }
             case let .DeleteMessagesWithGlobalIds(ids):
+                let messageIds = transaction.messageIdsForGlobalIds(ids)
+                storeAyuGramDeletedMessageSnapshots(
+                    policy: messageHistoryPolicy,
+                    accountPeerId: accountPeerId,
+                    messages: messageIds.compactMap { transaction.getMessage($0) },
+                    transaction: transaction
+                )
                 var resourceIds: [MediaResourceId] = []
                 transaction.deleteMessagesWithGlobalIds(ids, forEachMedia: { media in
                     addMessageMediaResourceIdsToRemove(media: media, resourceIds: &resourceIds)
@@ -4517,6 +4566,12 @@ func replayFinalState(
                 }
                 deletedMessageIds.append(contentsOf: ids.map { .global($0) })
             case let .DeleteMessages(ids):
+                storeAyuGramDeletedMessageSnapshots(
+                    policy: messageHistoryPolicy,
+                    accountPeerId: accountPeerId,
+                    messages: ids.compactMap { transaction.getMessage($0) },
+                    transaction: transaction
+                )
                 _internal_deleteMessages(transaction: transaction, mediaBox: mediaBox, ids: ids, manualAddMessageThreadStatsDifference: { id, add, remove in
                     addMessageThreadStatsDifference(threadKey: id, remove: remove, addedMessagePeer: nil, addedMessageId: nil, isOutgoing: false)
                 })
@@ -4525,6 +4580,19 @@ func replayFinalState(
                 if let message = transaction.getMessage(id) {
                     updatePeerChatInclusionWithMinTimestamp(transaction: transaction, id: id.peerId, minTimestamp: message.timestamp, forceRootGroupIfNotExists: false)
                 }
+                var deletedMessages: [Message] = []
+                transaction.withAllMessages(peerId: id.peerId, namespace: id.namespace) { message in
+                    if message.id.id >= 1 && message.id.id <= id.id {
+                        deletedMessages.append(message)
+                    }
+                    return true
+                }
+                storeAyuGramDeletedMessageSnapshots(
+                    policy: messageHistoryPolicy,
+                    accountPeerId: accountPeerId,
+                    messages: deletedMessages,
+                    transaction: transaction
+                )
                 var resourceIds: [MediaResourceId] = []
                 transaction.deleteMessagesInRange(peerId: id.peerId, namespace: id.namespace, minId: 1, maxId: id.id, forEachMedia: { media in
                     addMessageMediaResourceIdsToRemove(media: media, resourceIds: &resourceIds)

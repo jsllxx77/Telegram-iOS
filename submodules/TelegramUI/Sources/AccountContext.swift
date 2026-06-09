@@ -536,6 +536,7 @@ public final class AccountContextImpl: AccountContext {
         |> map { sharedData -> AccountMessageHistoryPolicy in
             let settings = ayuGramSettings(sharedData: sharedData)
             return AccountMessageHistoryPolicy(
+                saveDeletedMessages: settings.saveDeletedMessages,
                 saveMessagesHistory: settings.saveMessagesHistory,
                 saveForBots: settings.saveForBots
             )

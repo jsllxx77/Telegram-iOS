@@ -26,6 +26,7 @@ import TelegramNotices
 import ReactionListContextMenuContent
 import TelegramUIPreferences
 import AyuGramCore
+import AyuGramUI
 import TranslateUI
 import DebugSettingsUI
 import ChatPresentationInterfaceState
@@ -1174,15 +1175,6 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
             })))
         }
         
-        if data.canReadUntil, let readUntilMessage = readUntilMessage {
-            actions.append(.action(ContextMenuActionItem(text: "Read Until", icon: { theme in
-                return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Read"), color: theme.actionSheet.primaryTextColor)
-            }, action: { _, f in
-                readUntilMessage(message)
-                f(.dismissWithoutContent)
-            })))
-        }
-
         var isReplyThreadHead = false
         if case let .replyThread(replyThreadMessage) = chatPresentationInterfaceState.chatLocation {
             isReplyThreadHead = messages[0].id == replyThreadMessage.effectiveTopId
@@ -1531,6 +1523,56 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
                     controllerInteraction.openMessageReplies(messages[0].id, true, true)
                 })
             })))
+        }
+
+        var ayuGramHasEditedHistory = false
+        if ayuSettings.saveMessagesHistory {
+            ayuGramHasEditedHistory = message.attributes.contains(where: { attribute in
+                if let attribute = attribute as? EditedMessageAttribute, !attribute.isHidden, attribute.date != 0 {
+                    return true
+                }
+                return false
+            })
+        }
+        let ayuGramAuthorPeer = message.author
+        let ayuGramCanViewUserMessages = ayuGramAuthorPeer != nil && (message.id.peerId.namespace == Namespaces.Peer.CloudGroup || message.id.peerId.namespace == Namespaces.Peer.CloudChannel)
+        let ayuGramCanRepeatMessage = messages.count == 1 && data.messageActions.options.contains(.forward) && canSendMessagesToChat(chatPresentationInterfaceState) && !message.isCopyProtected() && message.id.namespace == Namespaces.Message.Cloud
+        let ayuGramCanHideMessageLocally = messages.count == 1 && data.messageActions.options.contains(.deleteLocally) && !message.id.peerId.isRepliesOrVerificationCodes && !message.id.peerId.isTelegramNotifications && message.id.peerId != context.account.peerId && !Namespaces.Message.allLocal.contains(message.id.namespace)
+        let ayuGramCanAddFilter = !messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let ayuGramShadowBanPeerId = ayuGramAuthorPeer?.id ?? message.id.peerId
+        let ayuGramCanShadowBan = ayuGramShadowBanPeerId != context.account.peerId && (ayuGramShadowBanPeerId.namespace == Namespaces.Peer.CloudUser || ayuGramShadowBanPeerId.namespace == Namespaces.Peer.CloudChannel)
+        let ayuGramShadowBanId = ayuGramShadowBanPeerId.toInt64()
+        let ayuGramDescriptors = ayuGramMessageContextMenuDescriptors(input: AyuGramMessageContextMenuInput(
+            settings: ayuSettings,
+            hasEditedHistory: ayuGramHasEditedHistory,
+            canViewDeletedMessages: true,
+            canViewMessageDetails: message.id.namespace == Namespaces.Message.Cloud,
+            canViewUserMessages: ayuGramCanViewUserMessages,
+            canRepeatMessage: ayuGramCanRepeatMessage,
+            canReadUntil: data.canReadUntil && readUntilMessage != nil,
+            canHideMessageLocally: ayuGramCanHideMessageLocally,
+            canAddFilter: ayuGramCanAddFilter,
+            canShadowBan: ayuGramCanShadowBan,
+            isShadowBanned: ayuSettings.shadowBanIds.contains(ayuGramShadowBanId),
+            isExtendedMenu: false
+        ))
+        if !ayuGramDescriptors.isEmpty {
+            if !actions.isEmpty {
+                actions.append(.separator)
+            }
+            for descriptor in ayuGramDescriptors {
+                actions.append(.action(ayuGramContextMenuItem(
+                    descriptor: descriptor,
+                    context: context,
+                    message: message,
+                    threadId: threadId,
+                    messageText: messageText,
+                    authorPeer: ayuGramAuthorPeer,
+                    readUntilMessage: readUntilMessage,
+                    controllerInteraction: controllerInteraction,
+                    interfaceInteraction: interfaceInteraction
+                )))
+            }
         }
         
         let isMigrated: Bool
@@ -2373,6 +2415,100 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
         
         return ContextController.Items(content: .list(actions), tip: nil)
     }
+}
+
+private func ayuGramContextMenuItem(
+    descriptor: AyuGramMessageContextMenuDescriptor,
+    context: AccountContext,
+    message: Message,
+    threadId: Int64?,
+    messageText: String,
+    authorPeer: Peer?,
+    readUntilMessage: ((Message) -> Void)?,
+    controllerInteraction: ChatControllerInteraction,
+    interfaceInteraction: ChatPanelInterfaceInteraction
+) -> ContextMenuActionItem {
+    let textColor: ContextMenuActionItemTextColor = descriptor.isDestructive ? .destructive : .primary
+    return ContextMenuActionItem(text: descriptor.title, textColor: textColor, icon: { theme in
+        let color = descriptor.isDestructive ? theme.actionSheet.destructiveActionTextColor : theme.actionSheet.primaryTextColor
+        return generateTintedImage(image: UIImage(bundleImageName: descriptor.iconName), color: color)
+    }, action: { _, f in
+        switch descriptor.action {
+        case .viewEditedHistory:
+            f(.dismissWithoutContent)
+            controllerInteraction.navigationController()?.pushViewController(ayuGramEditedHistoryController(context: context, messageId: message.id))
+        case .viewDeletedMessages:
+            f(.dismissWithoutContent)
+            controllerInteraction.navigationController()?.pushViewController(ayuGramDeletedMessagesController(context: context, peerId: message.id.peerId, threadId: threadId))
+        case .messageDetails:
+            f(.dismissWithoutContent)
+            ayuGramDisplayContextMenuPlaceholder(controllerInteraction: controllerInteraction, text: "Message details will be available after Task 12.")
+        case .userMessages:
+            if let authorPeer = authorPeer {
+                interfaceInteraction.beginMessageSearch(.member(authorPeer), "")
+            }
+            f(.dismissWithoutContent)
+        case .repeatMessage:
+            let repeatedMessage = EnqueueMessage.forward(
+                source: message.id,
+                threadId: message.threadId,
+                grouping: .none,
+                attributes: [],
+                correlationId: nil
+            )
+            let _ = (enqueueMessages(account: context.account, peerId: message.id.peerId, messages: [repeatedMessage])
+            |> deliverOnMainQueue).startStandalone(completed: {
+                controllerInteraction.displayUndo(.info(title: nil, text: "Message repeated", timeout: nil, customUndoText: nil))
+            })
+            f(.dismissWithoutContent)
+        case .readUntil:
+            if let readUntilMessage = readUntilMessage {
+                readUntilMessage(message)
+            }
+            f(.dismissWithoutContent)
+        case .hideMessageLocally:
+            f(.dismissWithoutContent)
+            ayuGramConfirmHideMessageLocally(context: context, message: message, controllerInteraction: controllerInteraction)
+        case .addFilter:
+            f(.dismissWithoutContent)
+            let filterText = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if filterText.isEmpty {
+                ayuGramDisplayContextMenuPlaceholder(controllerInteraction: controllerInteraction, text: "Select text before adding a filter.")
+            } else {
+                ayuGramDisplayContextMenuPlaceholder(controllerInteraction: controllerInteraction, text: "Filter editing will be available after Task 14.")
+            }
+        case .shadowBan:
+            f(.dismissWithoutContent)
+            ayuGramDisplayContextMenuPlaceholder(controllerInteraction: controllerInteraction, text: "Shadow ban will be available after filter storage is implemented.")
+        }
+    })
+}
+
+private func ayuGramDisplayContextMenuPlaceholder(
+    controllerInteraction: ChatControllerInteraction,
+    text: String
+) {
+    controllerInteraction.displayUndo(.info(title: nil, text: text, timeout: nil, customUndoText: nil))
+}
+
+private func ayuGramConfirmHideMessageLocally(
+    context: AccountContext,
+    message: Message,
+    controllerInteraction: ChatControllerInteraction
+) {
+    let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+    controllerInteraction.presentController(textAlertController(
+        context: context,
+        title: "Hide Message Locally",
+        text: "Hide this message only for this local account?",
+        actions: [
+            TextAlertAction(type: .genericAction, title: presentationData.strings.Common_Cancel, action: {}),
+            TextAlertAction(type: .destructiveAction, title: "Hide", action: {
+                let _ = context.engine.messages.deleteMessagesInteractively(messageIds: [message.id], type: .forLocalPeer).startStandalone()
+            })
+        ],
+        actionLayout: .vertical
+    ), nil)
 }
 
 func canPerformEditingActions(limits: LimitsConfiguration, accountPeerId: PeerId, message: Message, unlimitedInterval: Bool) -> Bool {

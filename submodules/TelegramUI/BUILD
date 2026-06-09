@@ -59,6 +59,7 @@ swift_library(
         "//submodules/MtProtoKit:MtProtoKit",
         "//submodules/TelegramPresentationData:TelegramPresentationData",
         "//submodules/AyuGramCore:AyuGramCore",
+        "//submodules/AyuGramUI:AyuGramUI",
         "//submodules/AccountContext:AccountContext",
         "//submodules/LegacyComponents:LegacyComponents",
         "//submodules/lottie-ios:Lottie",

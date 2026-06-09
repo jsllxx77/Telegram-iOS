@@ -1198,6 +1198,7 @@ public class Account {
     public let shouldBeServiceTaskMaster = Promise<AccountServiceTaskMasterMode>()
     public let shouldKeepOnlinePresence = Promise<Bool>()
     private let shouldSendUploadProgress = Promise<Bool>(true)
+    private let accountPresenceNetworkPolicy = Promise<AccountPresenceNetworkPolicy>(AccountPresenceNetworkPolicy(sendOnlinePackets: true, sendOfflinePacketAfterOnline: false))
     public let autolockReportDeadline = Promise<Int32?>()
     public let shouldExplicitelyKeepWorkerConnections = Promise<Bool>(false)
     public let shouldKeepBackgroundDownloadConnections = Promise<Bool>(false)
@@ -1292,7 +1293,7 @@ public class Account {
         
         self.contactSyncManager = ContactSyncManager(postbox: postbox, network: network, accountPeerId: peerId, stateManager: self.stateManager)
         self.localInputActivityManager = PeerInputActivityManager()
-        self.accountPresenceManager = AccountPresenceManager(shouldKeepOnlinePresence: self.shouldKeepOnlinePresence.get(), network: network)
+        self.accountPresenceManager = AccountPresenceManager(shouldKeepOnlinePresence: self.shouldKeepOnlinePresence.get(), networkPolicy: self.accountPresenceNetworkPolicy.get(), network: network)
         let _ = (postbox.transaction { transaction -> Void in
             transaction.updatePeerPresencesInternal(presences: [peerId: TelegramUserPresence(status: .present(until: Int32.max - 1), lastActivity: 0)], merge: { _, updated in return updated })
             transaction.setNeedsPeerGroupMessageStatsSynchronization(groupId: Namespaces.PeerGroup.archive, namespace: Namespaces.Message.Cloud)
@@ -1653,6 +1654,10 @@ public class Account {
 
     public func updateShouldSendUploadProgress(_ value: Signal<Bool, NoError>) {
         self.shouldSendUploadProgress.set(value)
+    }
+
+    public func updateAccountPresenceNetworkPolicy(_ value: Signal<AccountPresenceNetworkPolicy, NoError>) {
+        self.accountPresenceNetworkPolicy.set(value)
     }
     
     public func addUpdates(serializedData: Data) -> Void {

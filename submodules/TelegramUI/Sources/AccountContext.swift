@@ -170,6 +170,7 @@ public final class AccountContextImpl: AccountContext {
     
     private var experimentalUISettingsDisposable: Disposable?
     private var ayuGramUploadProgressPolicyDisposable: Disposable?
+    private var ayuGramPresencePolicyDisposable: Disposable?
     
     public let cachedGroupCallContexts: AccountGroupCallContextCache
     
@@ -515,6 +516,20 @@ public final class AccountContextImpl: AccountContext {
         |> distinctUntilChanged).start(next: { value in
             account.updateShouldSendUploadProgress(.single(value))
         })
+
+        self.ayuGramPresencePolicyDisposable = (sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.ayuGramSettings])
+        |> map { sharedData -> AccountPresenceNetworkPolicy in
+            let settings = ayuGramSettings(sharedData: sharedData)
+            let accountId = account.peerId.id._internalGetInt64Value()
+            let ghostSettings = settings.useGlobalGhostMode ? settings.globalGhostSettings : (settings.ghostAccounts[accountId] ?? AyuGramGhostSettings.defaultSettings)
+            return AccountPresenceNetworkPolicy(
+                sendOnlinePackets: ghostSettings.sendOnlinePackets && !ghostSettings.sendOnlinePacketsLocked,
+                sendOfflinePacketAfterOnline: ghostSettings.sendOfflinePacketAfterOnline || ghostSettings.sendOfflinePacketAfterOnlineLocked
+            )
+        }
+        |> distinctUntilChanged).start(next: { value in
+            account.updateAccountPresenceNetworkPolicy(.single(value))
+        })
     }
     
     deinit {
@@ -525,6 +540,7 @@ public final class AccountContextImpl: AccountContext {
         self.countriesConfigurationDisposable?.dispose()
         self.experimentalUISettingsDisposable?.dispose()
         self.ayuGramUploadProgressPolicyDisposable?.dispose()
+        self.ayuGramPresencePolicyDisposable?.dispose()
         self.animatedEmojiStickersDisposable?.dispose()
         self.userLimitsConfigurationDisposable?.dispose()
         self.peerNameColorsConfigurationDisposable?.dispose()

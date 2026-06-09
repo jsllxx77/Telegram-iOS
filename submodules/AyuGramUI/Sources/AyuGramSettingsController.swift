@@ -61,6 +61,8 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
     case showMessageSeconds(Bool)
     case hideSimilarChannels(Bool)
     case disableOpenLinkWarning(Bool)
+    case disableAds(Bool)
+    case disableStories(Bool)
 
     case translationHeader
     case translationProvider(AyuTranslationProvider)
@@ -78,7 +80,7 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return AyuGramSettingsSection.filters.rawValue
         case .appearanceHeader, .semiTransparentDeletedMessages, .messageBubbleRadius, .avatarCorners, .singleCornerRadius, .removeMessageTail, .replaceBottomInfoWithIcons:
             return AyuGramSettingsSection.appearance.rawValue
-        case .chatControlsHeader, .hideFastShare, .showPeerId, .showMessageSeconds, .hideSimilarChannels, .disableOpenLinkWarning:
+        case .chatControlsHeader, .hideFastShare, .showPeerId, .showMessageSeconds, .hideSimilarChannels, .disableOpenLinkWarning, .disableAds, .disableStories:
             return AyuGramSettingsSection.chatControls.rawValue
         case .translationHeader, .translationProvider:
             return AyuGramSettingsSection.translation.rawValue
@@ -135,6 +137,10 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return 404
         case .disableOpenLinkWarning:
             return 405
+        case .disableAds:
+            return 406
+        case .disableStories:
+            return 407
         case .translationHeader:
             return 500
         case .translationProvider:
@@ -229,6 +235,10 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return ayuGramSwitchItem(presentationData: presentationData, title: "Hide Similar Channels", value: value, section: self.section, arguments: arguments, keyPath: \.hideSimilarChannels)
         case let .disableOpenLinkWarning(value):
             return ayuGramSwitchItem(presentationData: presentationData, title: "Disable Open Link Warning", value: value, section: self.section, arguments: arguments, keyPath: \.disableOpenLinkWarning)
+        case let .disableAds(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "Disable Ads", value: value, section: self.section, arguments: arguments, keyPath: \.disableAds)
+        case let .disableStories(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "Disable Stories", value: value, section: self.section, arguments: arguments, keyPath: \.disableStories)
 
         case .translationHeader:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: "TRANSLATION", sectionId: self.section)
@@ -292,6 +302,8 @@ private func ayuGramSettingsControllerEntries(settings: AyuGramSettings) -> [Ayu
     entries.append(.showMessageSeconds(settings.showMessageSeconds))
     entries.append(.hideSimilarChannels(settings.hideSimilarChannels))
     entries.append(.disableOpenLinkWarning(settings.disableOpenLinkWarning))
+    entries.append(.disableAds(settings.disableAds))
+    entries.append(.disableStories(settings.disableStories))
 
     entries.append(.translationHeader)
     entries.append(.translationProvider(settings.translationProvider))

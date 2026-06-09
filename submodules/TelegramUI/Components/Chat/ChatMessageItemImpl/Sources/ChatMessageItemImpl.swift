@@ -439,9 +439,9 @@ public final class ChatMessageItemImpl: ChatMessageItem, CustomStringConvertible
                     } else {
                         switch content {
                         case let .message(_, _, _, attributes, _):
-                            storyStats = attributes.authorStoryStats
+                            storyStats = associatedData.ayuGramData.disableStories ? nil : attributes.authorStoryStats
                         case let .group(messages):
-                            storyStats = messages.first?.3.authorStoryStats
+                            storyStats = associatedData.ayuGramData.disableStories ? nil : messages.first?.3.authorStoryStats
                         }
                     }
                     

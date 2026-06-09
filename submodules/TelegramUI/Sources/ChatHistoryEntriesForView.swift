@@ -706,7 +706,7 @@ func chatHistoryEntriesForView(
             }
         }
         
-        if !dynamicAdMessages.isEmpty {
+        if !ayuGramSettings.disableAds && !dynamicAdMessages.isEmpty {
             assert(entries.sorted() == entries)
             for message in dynamicAdMessages {
                 entries.append(.MessageEntry(message, presentationData, false, nil, .none, ChatMessageEntryAttributes(rank: nil, isContact: false, contentTypeHint: .generic, updatingMedia: nil, isPlaying: false, isCentered: false, authorStoryStats: nil, displayContinueThreadFooter: false, pinToTop: false)))
@@ -714,7 +714,7 @@ func chatHistoryEntriesForView(
             entries.sort()
         }
 
-        if view.laterId == nil && !view.isLoading {
+        if !ayuGramSettings.disableAds && view.laterId == nil && !view.isLoading {
             if !entries.isEmpty, case let .MessageEntry(lastMessage, _, _, _, _, _) = entries[entries.count - 1], let message = adMessage {
                 var nextAdMessageId: Int32 = 10000
                 let updatedMessage = Message(

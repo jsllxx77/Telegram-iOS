@@ -9187,6 +9187,9 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
     }
     
     func openStories(peerId: EnginePeer.Id, avatarHeaderNode: ChatMessageAvatarHeaderNodeImpl?, avatarNode: AvatarNode?) {
+        if self.ayuGramSettingsValue.with({ settings in settings.disableStories }) {
+            return
+        }
         if let avatarNode = avatarHeaderNode?.avatarNode ?? avatarNode {
             StoryContainerScreen.openPeerStories(context: self.context, peerId: peerId, parentController: self, avatarNode: avatarNode)
         }

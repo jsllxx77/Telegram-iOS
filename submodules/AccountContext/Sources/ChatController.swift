@@ -16,7 +16,8 @@ public struct ChatMessageItemAyuGramData: Equatable {
         hideSimilarChannels: false,
         peerIdDisplay: 0,
         avatarCorners: 23,
-        replaceBottomInfoWithIcons: false
+        replaceBottomInfoWithIcons: false,
+        disableStories: false
     )
 
     public let showMessageSeconds: Bool
@@ -25,6 +26,7 @@ public struct ChatMessageItemAyuGramData: Equatable {
     public let peerIdDisplay: Int32
     public let avatarCorners: Int32
     public let replaceBottomInfoWithIcons: Bool
+    public let disableStories: Bool
 
     public init(
         showMessageSeconds: Bool,
@@ -32,7 +34,8 @@ public struct ChatMessageItemAyuGramData: Equatable {
         hideSimilarChannels: Bool,
         peerIdDisplay: Int32,
         avatarCorners: Int32,
-        replaceBottomInfoWithIcons: Bool
+        replaceBottomInfoWithIcons: Bool,
+        disableStories: Bool
     ) {
         self.showMessageSeconds = showMessageSeconds
         self.hideFastShare = hideFastShare
@@ -40,6 +43,7 @@ public struct ChatMessageItemAyuGramData: Equatable {
         self.peerIdDisplay = peerIdDisplay
         self.avatarCorners = avatarCorners
         self.replaceBottomInfoWithIcons = replaceBottomInfoWithIcons
+        self.disableStories = disableStories
     }
 }
 

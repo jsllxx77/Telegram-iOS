@@ -15,6 +15,7 @@ swift_library(
         "//submodules/Display:Display",
         "//submodules/ItemListUI:ItemListUI",
         "//submodules/MergeLists:MergeLists",
+        "//submodules/Postbox:Postbox",
         "//submodules/PresentationDataUtils:PresentationDataUtils",
         "//submodules/SSignalKit/SwiftSignalKit:SwiftSignalKit",
         "//submodules/TelegramCore:TelegramCore",

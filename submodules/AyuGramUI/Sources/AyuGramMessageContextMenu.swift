@@ -116,8 +116,7 @@ public func ayuGramMessageContextMenuDescriptors(
         descriptors.append(AyuGramMessageContextMenuDescriptor(
             action: .messageDetails,
             title: "Message Details",
-            iconName: "Chat/Context Menu/Info",
-            isPlaceholder: true
+            iconName: "Chat/Context Menu/Info"
         ))
     }
 

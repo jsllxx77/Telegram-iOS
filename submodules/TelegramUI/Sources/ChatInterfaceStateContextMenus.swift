@@ -2442,7 +2442,7 @@ private func ayuGramContextMenuItem(
             controllerInteraction.navigationController()?.pushViewController(ayuGramDeletedMessagesController(context: context, peerId: message.id.peerId, threadId: threadId))
         case .messageDetails:
             f(.dismissWithoutContent)
-            ayuGramDisplayContextMenuPlaceholder(controllerInteraction: controllerInteraction, text: "Message details will be available after Task 12.")
+            controllerInteraction.navigationController()?.pushViewController(ayuGramMessageDetailsController(context: context, message: message))
         case .userMessages:
             if let authorPeer = authorPeer {
                 interfaceInteraction.beginMessageSearch(.member(authorPeer), "")

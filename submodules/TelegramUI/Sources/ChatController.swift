@@ -11,6 +11,7 @@ import Intents
 import LegacyComponents
 import TelegramPresentationData
 import TelegramUIPreferences
+import AyuGramCore
 import DeviceAccess
 import TextFormat
 import TelegramBaseController
@@ -431,6 +432,8 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
     
     var automaticMediaDownloadSettings: MediaAutoDownloadSettings
     var automaticMediaDownloadSettingsDisposable: Disposable?
+    let ayuGramSettingsValue = Atomic<AyuGramSettings>(value: .defaultSettings)
+    var ayuGramSettingsDisposable: Disposable?
     
     var disableStickerAnimationsPromise = ValuePromise<Bool>(false)
     var disableStickerAnimationsValue = false
@@ -6574,6 +6577,11 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
                 }
             }
         })
+
+        self.ayuGramSettingsDisposable = (context.sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.ayuGramSettings])
+        |> deliverOnMainQueue).startStrict(next: { [weak self] sharedData in
+            self?.ayuGramSettingsValue.swap(ayuGramSettings(sharedData: sharedData))
+        })
         
         self.stickerSettingsDisposable = combineLatest(queue: Queue.mainQueue(),
             context.sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.stickerSettings]),
@@ -6710,6 +6718,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
         self.recordingActivityDisposable?.dispose()
         self.acquiredRecordingActivityDisposable?.dispose()
         self.presentationDataDisposable?.dispose()
+        self.ayuGramSettingsDisposable?.dispose()
         self.searchDisposable?.dispose()
         self.applicationInForegroundDisposable?.dispose()
         self.applicationInFocusDisposable?.dispose()
@@ -8436,6 +8445,12 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
         let silentPosting = self.presentationInterfaceState.interfaceState.silentPosting
         return transformEnqueueMessages(messages, silentPosting: silentPosting, postpone: postpone)
     }
+
+    private func currentAyuGramGhostSettings() -> AyuGramGhostSettings {
+        let settings = self.ayuGramSettingsValue.with { $0 }
+        let accountId = self.context.account.peerId.id._internalGetInt64Value()
+        return settings.useGlobalGhostMode ? settings.globalGhostSettings : (settings.ghostAccounts[accountId] ?? AyuGramGhostSettings.defaultSettings)
+    }
     
     @discardableResult func dismissAllUndoControllers() -> UndoOverlayController? {
         var currentOverlayController: UndoOverlayController?
@@ -8539,6 +8554,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
     }
         
     func transformEnqueueMessages(_ messages: [EnqueueMessage], silentPosting: Bool, scheduleTime: Int32? = nil, repeatPeriod: Int32? = nil, postpone: Bool = false) -> [EnqueueMessage] {
+        let effectiveSilentPosting = silentPosting || self.currentAyuGramGhostSettings().shouldSendWithoutSound
         var defaultThreadId: Int64?
         var defaultReplyMessageSubject: EngineMessageReplySubject?
         switch self.chatLocation {
@@ -8610,7 +8626,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
                     attributes.append(PaidStarsMessageAttribute(stars: sendPaidMessageStars, postponeSending: effectivePostpone))
                 }
                 
-                if silentPosting || scheduleTime != nil {
+                if effectiveSilentPosting || scheduleTime != nil {
                     for i in (0 ..< attributes.count).reversed() {
                         if attributes[i] is NotificationInfoMessageAttribute {
                             attributes.remove(at: i)
@@ -8618,7 +8634,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
                             attributes.remove(at: i)
                         }
                     }
-                    if silentPosting {
+                    if effectiveSilentPosting {
                         attributes.append(NotificationInfoMessageAttribute(flags: .muted))
                     }
                     if let scheduleTime {
@@ -9015,9 +9031,10 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
                 return
             }
             let replyMessageSubject = self.presentationInterfaceState.interfaceState.replyMessageSubject
+            let effectiveSilentPosting = silentPosting || self.currentAyuGramGhostSettings().shouldSendWithoutSound
             
             let sendPaidMessageStars = self.presentationInterfaceState.sendPaidMessageStars
-            if self.context.engine.messages.enqueueOutgoingMessageWithChatContextResult(to: peerId, threadId: self.chatLocation.threadId, botId: results.botId, result: result, replyToMessageId: replyMessageSubject?.subjectModel, hideVia: hideVia, silentPosting: silentPosting, scheduleTime: scheduleTime, sendPaidMessageStars: sendPaidMessageStars, postpone: postpone) {
+            if self.context.engine.messages.enqueueOutgoingMessageWithChatContextResult(to: peerId, threadId: self.chatLocation.threadId, botId: results.botId, result: result, replyToMessageId: replyMessageSubject?.subjectModel, hideVia: hideVia, silentPosting: effectiveSilentPosting, scheduleTime: scheduleTime, sendPaidMessageStars: sendPaidMessageStars, postpone: postpone) {
                 self.chatDisplayNode.setupSendActionOnViewUpdate({ [weak self] in
                     if let strongSelf = self {
                         strongSelf.chatDisplayNode.collapseInput()

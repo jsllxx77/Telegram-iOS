@@ -200,6 +200,8 @@ public final class AccountStateManager {
         private let callSessionManager: CallSessionManager?
         private let addIsContactUpdates: ([(PeerId, Bool)]) -> Void
         private let shouldKeepOnlinePresence: Signal<Bool, NoError>
+        private let messageHistoryPolicyValue = Atomic<AccountMessageHistoryPolicy>(value: .defaultValue)
+        private let messageHistoryPolicyDisposable = MetaDisposable()
         
         private let peerInputActivityManager: PeerInputActivityManager?
         let auxiliaryMethods: AccountAuxiliaryMethods
@@ -393,6 +395,7 @@ public final class AccountStateManager {
             callSessionManager: CallSessionManager?,
             addIsContactUpdates: @escaping ([(PeerId, Bool)]) -> Void,
             shouldKeepOnlinePresence: Signal<Bool, NoError>,
+            messageHistoryPolicy: Signal<AccountMessageHistoryPolicy, NoError>,
             peerInputActivityManager: PeerInputActivityManager?,
             auxiliaryMethods: AccountAuxiliaryMethods,
             updateConfigRequested: (() -> Void)?,
@@ -412,11 +415,18 @@ public final class AccountStateManager {
             self.updateConfigRequested = updateConfigRequested
             self.isPremiumUpdated = isPremiumUpdated
             self.messagesRemovedContext = messagesRemovedContext
+            self.messageHistoryPolicyDisposable.set((messageHistoryPolicy
+            |> distinctUntilChanged).start(next: { [weak self] value in
+                let _ = self?.messageHistoryPolicyValue.modify { _ in
+                    return value
+                }
+            }))
         }
         
         deinit {
             self.updateServiceDisposable.dispose()
             self.operationDisposable.dispose()
+            self.messageHistoryPolicyDisposable.dispose()
             self.appliedMaxMessageIdDisposable.dispose()
             self.appliedQtsDisposable.dispose()
             self.reportMessageDeliveryDisposable.dispose()
@@ -759,7 +769,8 @@ public final class AccountStateManager {
                         ),
                         removePossiblyDeliveredMessagesUniqueIds: [:],
                         ignoreDate: false,
-                        skipVerification: true
+                        skipVerification: true,
+                        messageHistoryPolicy: self.messageHistoryPolicyValue.with { $0 }
                     )
                     
                     if let result = result, !result.deletedMessageIds.isEmpty {
@@ -901,7 +912,7 @@ public final class AccountStateManager {
                                             let removePossiblyDeliveredMessagesUniqueIds = self?.removePossiblyDeliveredMessagesUniqueIds ?? Dictionary()
                                             return postbox.transaction { transaction -> (difference: Api.updates.Difference?, finalStatte: AccountReplayedFinalState?, skipBecauseOfError: Bool, resetState: Bool) in
                                                 let startTime = CFAbsoluteTimeGetCurrent()
-                                                let replayedState = replayFinalState(accountManager: accountManager, postbox: postbox, accountPeerId: accountPeerId, mediaBox: mediaBox, encryptionProvider: network.encryptionProvider, transaction: transaction, auxiliaryMethods: auxiliaryMethods, finalState: finalState, removePossiblyDeliveredMessagesUniqueIds: removePossiblyDeliveredMessagesUniqueIds, ignoreDate: false, skipVerification: false)
+                                                let replayedState = replayFinalState(accountManager: accountManager, postbox: postbox, accountPeerId: accountPeerId, mediaBox: mediaBox, encryptionProvider: network.encryptionProvider, transaction: transaction, auxiliaryMethods: auxiliaryMethods, finalState: finalState, removePossiblyDeliveredMessagesUniqueIds: removePossiblyDeliveredMessagesUniqueIds, ignoreDate: false, skipVerification: false, messageHistoryPolicy: self?.messageHistoryPolicyValue.with { $0 } ?? .defaultValue)
                                                 let deltaTime = CFAbsoluteTimeGetCurrent() - startTime
                                                 if deltaTime > 1.0 {
                                                     Logger.shared.log("State", "replayFinalState took \(deltaTime)s")
@@ -1046,7 +1057,7 @@ public final class AccountStateManager {
                                 return nil
                             } else {
                                 let startTime = CFAbsoluteTimeGetCurrent()
-                                let result = replayFinalState(accountManager: accountManager, postbox: postbox, accountPeerId: accountPeerId, mediaBox: mediaBox, encryptionProvider: network.encryptionProvider, transaction: transaction, auxiliaryMethods: auxiliaryMethods, finalState: finalState, removePossiblyDeliveredMessagesUniqueIds: removePossiblyDeliveredMessagesUniqueIds, ignoreDate: false, skipVerification: false)
+                                let result = replayFinalState(accountManager: accountManager, postbox: postbox, accountPeerId: accountPeerId, mediaBox: mediaBox, encryptionProvider: network.encryptionProvider, transaction: transaction, auxiliaryMethods: auxiliaryMethods, finalState: finalState, removePossiblyDeliveredMessagesUniqueIds: removePossiblyDeliveredMessagesUniqueIds, ignoreDate: false, skipVerification: false, messageHistoryPolicy: self?.messageHistoryPolicyValue.with { $0 } ?? .defaultValue)
                                 
                                 if let result = result, !result.deletedMessageIds.isEmpty {
                                     messagesRemovedContext.addIsMessagesDeletedInteractively(ids: result.deletedMessageIds)
@@ -1341,7 +1352,7 @@ public final class AccountStateManager {
                 let messagesRemovedContext = self.messagesRemovedContext
                 let signal = self.postbox.transaction { transaction -> AccountReplayedFinalState? in
                     let startTime = CFAbsoluteTimeGetCurrent()
-                    let result = replayFinalState(accountManager: accountManager, postbox: postbox, accountPeerId: accountPeerId, mediaBox: mediaBox, encryptionProvider: network.encryptionProvider, transaction: transaction, auxiliaryMethods: auxiliaryMethods, finalState: finalState, removePossiblyDeliveredMessagesUniqueIds: removePossiblyDeliveredMessagesUniqueIds, ignoreDate: false, skipVerification: false)
+                    let result = replayFinalState(accountManager: accountManager, postbox: postbox, accountPeerId: accountPeerId, mediaBox: mediaBox, encryptionProvider: network.encryptionProvider, transaction: transaction, auxiliaryMethods: auxiliaryMethods, finalState: finalState, removePossiblyDeliveredMessagesUniqueIds: removePossiblyDeliveredMessagesUniqueIds, ignoreDate: false, skipVerification: false, messageHistoryPolicy: self.messageHistoryPolicyValue.with { $0 })
                     let deltaTime = CFAbsoluteTimeGetCurrent() - startTime
                     if deltaTime > 1.0 {
                         Logger.shared.log("State", "replayFinalState took \(deltaTime)s")
@@ -1394,7 +1405,7 @@ public final class AccountStateManager {
             
             let signal = self.postbox.transaction { transaction -> AccountReplayedFinalState? in
                 let startTime = CFAbsoluteTimeGetCurrent()
-                let result = replayFinalState(accountManager: accountManager, postbox: postbox, accountPeerId: accountPeerId, mediaBox: mediaBox, encryptionProvider: network.encryptionProvider, transaction: transaction, auxiliaryMethods: auxiliaryMethods, finalState: finalState, removePossiblyDeliveredMessagesUniqueIds: removePossiblyDeliveredMessagesUniqueIds, ignoreDate: false, skipVerification: false)
+                let result = replayFinalState(accountManager: accountManager, postbox: postbox, accountPeerId: accountPeerId, mediaBox: mediaBox, encryptionProvider: network.encryptionProvider, transaction: transaction, auxiliaryMethods: auxiliaryMethods, finalState: finalState, removePossiblyDeliveredMessagesUniqueIds: removePossiblyDeliveredMessagesUniqueIds, ignoreDate: false, skipVerification: false, messageHistoryPolicy: self.messageHistoryPolicyValue.with { $0 })
                 
                 if let result = result, !result.deletedMessageIds.isEmpty {
                     messagesRemovedContext.addIsMessagesDeletedInteractively(ids: result.deletedMessageIds)
@@ -1486,7 +1497,8 @@ public final class AccountStateManager {
                                                 finalState: finalState,
                                                 removePossiblyDeliveredMessagesUniqueIds: removePossiblyDeliveredMessagesUniqueIds,
                                                 ignoreDate: true,
-                                                skipVerification: false
+                                                skipVerification: false,
+                                                messageHistoryPolicy: self?.messageHistoryPolicyValue.with { $0 } ?? .defaultValue
                                             )
                                             
                                             if let replayedState = replayedState, !replayedState.deletedMessageIds.isEmpty {
@@ -2124,6 +2136,7 @@ public final class AccountStateManager {
         callSessionManager: CallSessionManager?,
         addIsContactUpdates: @escaping ([(PeerId, Bool)]) -> Void,
         shouldKeepOnlinePresence: Signal<Bool, NoError>,
+        messageHistoryPolicy: Signal<AccountMessageHistoryPolicy, NoError> = .single(.defaultValue),
         peerInputActivityManager: PeerInputActivityManager?,
         auxiliaryMethods: AccountAuxiliaryMethods
     ) {
@@ -2149,6 +2162,7 @@ public final class AccountStateManager {
                 callSessionManager: callSessionManager,
                 addIsContactUpdates: addIsContactUpdates,
                 shouldKeepOnlinePresence: shouldKeepOnlinePresence,
+                messageHistoryPolicy: messageHistoryPolicy,
                 peerInputActivityManager: peerInputActivityManager,
                 auxiliaryMethods: auxiliaryMethods,
                 updateConfigRequested: {

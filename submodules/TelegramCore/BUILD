@@ -11,6 +11,7 @@ swift_library(
     ],
     deps = [
         "//submodules/TelegramApi:TelegramApi",
+        "//submodules/AyuGramCore:AyuGramCore",
         "//submodules/MtProtoKit:MtProtoKit",
         "//submodules/SSignalKit/SwiftSignalKit:SwiftSignalKit",
         "//submodules/Postbox:Postbox",

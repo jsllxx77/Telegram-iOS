@@ -1199,6 +1199,7 @@ public class Account {
     public let shouldKeepOnlinePresence = Promise<Bool>()
     private let shouldSendUploadProgress = Promise<Bool>(true)
     private let accountPresenceNetworkPolicy = Promise<AccountPresenceNetworkPolicy>(AccountPresenceNetworkPolicy(sendOnlinePackets: true, sendOfflinePacketAfterOnline: false))
+    private let accountMessageHistoryPolicy = Promise<AccountMessageHistoryPolicy>(AccountMessageHistoryPolicy.defaultValue)
     public let autolockReportDeadline = Promise<Int32?>()
     public let shouldExplicitelyKeepWorkerConnections = Promise<Bool>(false)
     public let shouldKeepBackgroundDownloadConnections = Promise<Bool>(false)
@@ -1274,7 +1275,7 @@ public class Account {
         
         self.stateManager = AccountStateManager(accountPeerId: self.peerId, accountManager: accountManager, postbox: self.postbox, network: self.network, callSessionManager: self.callSessionManager, addIsContactUpdates: { [weak self] updates in
             self?.contactSyncManager?.addIsContactUpdates(updates)
-        }, shouldKeepOnlinePresence: self.shouldKeepOnlinePresence.get(), peerInputActivityManager: self.peerInputActivityManager, auxiliaryMethods: auxiliaryMethods)
+        }, shouldKeepOnlinePresence: self.shouldKeepOnlinePresence.get(), messageHistoryPolicy: self.accountMessageHistoryPolicy.get(), peerInputActivityManager: self.peerInputActivityManager, auxiliaryMethods: auxiliaryMethods)
         
         self.viewTracker = AccountViewTracker(account: self)
         self.viewTracker.resetPeerHoleManagement = { [weak self] peerId in
@@ -1659,6 +1660,10 @@ public class Account {
     public func updateAccountPresenceNetworkPolicy(_ value: Signal<AccountPresenceNetworkPolicy, NoError>) {
         self.accountPresenceNetworkPolicy.set(value)
     }
+
+    public func updateAccountMessageHistoryPolicy(_ value: Signal<AccountMessageHistoryPolicy, NoError>) {
+        self.accountMessageHistoryPolicy.set(value)
+    }
     
     public func addUpdates(serializedData: Data) -> Void {
         /*if let object = Api.parse(Buffer(data: serializedData)) {
@@ -1837,6 +1842,7 @@ public func standaloneStateManager(
                                         addIsContactUpdates: { _ in
                                         },
                                         shouldKeepOnlinePresence: .single(false),
+                                        messageHistoryPolicy: .single(AccountMessageHistoryPolicy.defaultValue),
                                         peerInputActivityManager: nil,
                                         auxiliaryMethods: auxiliaryMethods
                                     )

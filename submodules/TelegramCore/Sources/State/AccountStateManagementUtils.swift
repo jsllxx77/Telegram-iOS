@@ -1,4 +1,5 @@
 import Foundation
+import AyuGramCore
 import Postbox
 import SwiftSignalKit
 import TelegramApi
@@ -3894,6 +3895,83 @@ private func recordPeerActivityTimestamp(peerId: PeerId, timestamp: Int32, into 
     }
 }
 
+private func ayuGramEncodedEntitiesData(from message: Message) -> Data? {
+    guard let textEntitiesAttribute = message.textEntitiesAttribute else {
+        return nil
+    }
+
+    let encoder = PostboxEncoder()
+    encoder.encodeRootObject(textEntitiesAttribute)
+    return encoder.makeData()
+}
+
+private func ayuGramMediaSummary(from message: Message) -> String? {
+    if message.media.isEmpty {
+        return nil
+    }
+
+    return message.media
+        .map { media in
+            return String(describing: type(of: media))
+        }
+        .sorted()
+        .joined(separator: ",")
+}
+
+private func storeAyuGramEditedMessageSnapshot(
+    policy: AccountMessageHistoryPolicy,
+    accountPeerId: PeerId,
+    previousMessage: Message,
+    updatedMessage: Message,
+    transaction: Transaction
+) {
+    guard policy.saveMessagesHistory else {
+        return
+    }
+
+    guard !previousMessage.text.isEmpty else {
+        return
+    }
+
+    guard previousMessage.text != updatedMessage.text else {
+        return
+    }
+
+    guard previousMessage.flags.contains(.Incoming) else {
+        return
+    }
+
+    if !policy.saveForBots, let author = previousMessage.author as? TelegramUser, author.botInfo != nil {
+        return
+    }
+
+    let views = (previousMessage.attributes.first(where: { $0 is ViewCountMessageAttribute }) as? ViewCountMessageAttribute)?.count
+    let editedTimestamp = (updatedMessage.attributes.first(where: { $0 is EditedMessageAttribute }) as? EditedMessageAttribute)?.date
+    let snapshot = AyuGramMessageSnapshot(
+        accountPeerId: accountPeerId.toInt64(),
+        peerId: previousMessage.id.peerId.toInt64(),
+        threadId: previousMessage.threadId,
+        messageNamespace: previousMessage.id.namespace,
+        messageId: previousMessage.id.id,
+        stableId: Int64(previousMessage.stableId),
+        authorPeerId: previousMessage.author?.id.toInt64(),
+        timestamp: previousMessage.timestamp,
+        editTimestamp: editedTimestamp,
+        text: previousMessage.text,
+        entitiesData: ayuGramEncodedEntitiesData(from: previousMessage),
+        views: views.map { Int32(clamping: $0) },
+        forwardInfoData: nil,
+        mediaSummary: ayuGramMediaSummary(from: previousMessage),
+        createdAt: Int32(CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970)
+    )
+
+    transaction.updatePreferencesEntry(key: PreferencesKeys.ayuGramMessageHistoryStore(), { current in
+        var store = current?.get(AyuGramMessageHistoryStore.self) ?? .empty
+        store.addEditedSnapshot(snapshot)
+        return PreferencesEntry(store)
+    })
+}
+
 func replayFinalState(
     accountManager: AccountManager<TelegramAccountManagerTypes>,
     postbox: Postbox,
@@ -3905,7 +3983,8 @@ func replayFinalState(
     finalState: AccountFinalState,
     removePossiblyDeliveredMessagesUniqueIds: [Int64: PeerId],
     ignoreDate: Bool,
-    skipVerification: Bool
+    skipVerification: Bool,
+    messageHistoryPolicy: AccountMessageHistoryPolicy
 ) -> AccountReplayedFinalState? {
     if !skipVerification {
         let verified = verifyTransaction(transaction, finalState: finalState.state)
@@ -4472,6 +4551,16 @@ func replayFinalState(
                 }
             case let .EditMessage(id, message):
                 var generatedEvent: (reactionAuthor: Peer, reaction: MessageReaction.Reaction, message: Message, timestamp: Int32)?
+                let previousMessage = transaction.getMessage(id)
+                if let previousMessage = previousMessage {
+                    storeAyuGramEditedMessageSnapshot(
+                        policy: messageHistoryPolicy,
+                        accountPeerId: accountPeerId,
+                        previousMessage: previousMessage,
+                        updatedMessage: message,
+                        transaction: transaction
+                    )
+                }
                 transaction.updateMessage(id, update: { previousMessage in
                     var updatedFlags = message.flags
                     var updatedLocalTags = message.localTags

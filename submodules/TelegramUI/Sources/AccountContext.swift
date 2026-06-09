@@ -171,6 +171,7 @@ public final class AccountContextImpl: AccountContext {
     private var experimentalUISettingsDisposable: Disposable?
     private var ayuGramUploadProgressPolicyDisposable: Disposable?
     private var ayuGramPresencePolicyDisposable: Disposable?
+    private var ayuGramMessageHistoryPolicyDisposable: Disposable?
     
     public let cachedGroupCallContexts: AccountGroupCallContextCache
     
@@ -530,6 +531,18 @@ public final class AccountContextImpl: AccountContext {
         |> distinctUntilChanged).start(next: { value in
             account.updateAccountPresenceNetworkPolicy(.single(value))
         })
+
+        self.ayuGramMessageHistoryPolicyDisposable = (sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.ayuGramSettings])
+        |> map { sharedData -> AccountMessageHistoryPolicy in
+            let settings = ayuGramSettings(sharedData: sharedData)
+            return AccountMessageHistoryPolicy(
+                saveMessagesHistory: settings.saveMessagesHistory,
+                saveForBots: settings.saveForBots
+            )
+        }
+        |> distinctUntilChanged).start(next: { value in
+            account.updateAccountMessageHistoryPolicy(.single(value))
+        })
     }
     
     deinit {
@@ -541,6 +554,7 @@ public final class AccountContextImpl: AccountContext {
         self.experimentalUISettingsDisposable?.dispose()
         self.ayuGramUploadProgressPolicyDisposable?.dispose()
         self.ayuGramPresencePolicyDisposable?.dispose()
+        self.ayuGramMessageHistoryPolicyDisposable?.dispose()
         self.animatedEmojiStickersDisposable?.dispose()
         self.userLimitsConfigurationDisposable?.dispose()
         self.peerNameColorsConfigurationDisposable?.dispose()

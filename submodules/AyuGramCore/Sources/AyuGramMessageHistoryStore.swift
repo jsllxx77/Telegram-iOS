@@ -20,9 +20,7 @@ public struct AyuGramMessageHistoryStore: Codable, Equatable {
     }
 
     public mutating func addEditedSnapshot(_ snapshot: AyuGramMessageSnapshot) {
-        if let index = self.editedSnapshots.firstIndex(of: snapshot) {
-            self.editedSnapshots[index] = snapshot
-        } else {
+        if !self.editedSnapshots.contains(where: { Self.areEditedSnapshotsEquivalent($0, snapshot) }) {
             self.editedSnapshots.append(snapshot)
         }
     }
@@ -151,6 +149,19 @@ public struct AyuGramMessageHistoryStore: Codable, Equatable {
             return shouldRemove(snapshot)
         }
         return previousCount - self.deletedSnapshots.count
+    }
+
+    private static func areEditedSnapshotsEquivalent(_ lhs: AyuGramMessageSnapshot, _ rhs: AyuGramMessageSnapshot) -> Bool {
+        return lhs.hasSameMessageIdentity(as: rhs)
+            && lhs.threadId == rhs.threadId
+            && lhs.stableId == rhs.stableId
+            && lhs.authorPeerId == rhs.authorPeerId
+            && lhs.timestamp == rhs.timestamp
+            && lhs.editTimestamp == rhs.editTimestamp
+            && lhs.text == rhs.text
+            && lhs.entitiesData == rhs.entitiesData
+            && lhs.forwardInfoData == rhs.forwardInfoData
+            && lhs.mediaSummary == rhs.mediaSummary
     }
 
     public init(from decoder: Decoder) throws {

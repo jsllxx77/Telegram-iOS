@@ -24,6 +24,7 @@ import DCTAnimationCacheImpl
 import DCTMultiAnimationRendererImpl
 import AppBundle
 import DirectMediaImageCache
+import AyuGramCore
 
 private final class DeviceSpecificContactImportContext {
     let disposable = MetaDisposable()
@@ -168,6 +169,7 @@ public final class AccountContextImpl: AccountContext {
     private var managedAppSpecificContactsDisposable: Disposable?
     
     private var experimentalUISettingsDisposable: Disposable?
+    private var ayuGramUploadProgressPolicyDisposable: Disposable?
     
     public let cachedGroupCallContexts: AccountGroupCallContextCache
     
@@ -502,6 +504,17 @@ public final class AccountContextImpl: AccountContext {
             }
             (self.animationRenderer as? DCTMultiAnimationRendererImpl)?.useYuvA = settings.compressedEmojiCache
         })
+
+        self.ayuGramUploadProgressPolicyDisposable = (sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.ayuGramSettings])
+        |> map { sharedData -> Bool in
+            let settings = ayuGramSettings(sharedData: sharedData)
+            let accountId = account.peerId.id._internalGetInt64Value()
+            let ghostSettings = settings.useGlobalGhostMode ? settings.globalGhostSettings : (settings.ghostAccounts[accountId] ?? AyuGramGhostSettings.defaultSettings)
+            return ghostSettings.sendUploadProgress && !ghostSettings.sendUploadProgressLocked
+        }
+        |> distinctUntilChanged).start(next: { value in
+            account.updateShouldSendUploadProgress(.single(value))
+        })
     }
     
     deinit {
@@ -511,6 +524,7 @@ public final class AccountContextImpl: AccountContext {
         self.appConfigurationDisposable?.dispose()
         self.countriesConfigurationDisposable?.dispose()
         self.experimentalUISettingsDisposable?.dispose()
+        self.ayuGramUploadProgressPolicyDisposable?.dispose()
         self.animatedEmojiStickersDisposable?.dispose()
         self.userLimitsConfigurationDisposable?.dispose()
         self.peerNameColorsConfigurationDisposable?.dispose()

@@ -29,9 +29,10 @@ struct PeerInputActivityRecord: Equatable {
 private final class ManagedLocalTypingActivitiesContext {
     private var disposables: [PeerActivitySpace: (PeerInputActivityRecord, MetaDisposable)] = [:]
     
-    func update(activities: [PeerActivitySpace: [(PeerId, PeerInputActivityRecord)]]) -> (start: [(PeerActivitySpace, PeerInputActivityRecord?, MetaDisposable)], dispose: [MetaDisposable]) {
+    func update(activities: [PeerActivitySpace: [(PeerId, PeerInputActivityRecord)]]) -> (start: [(PeerActivitySpace, PeerInputActivityRecord?, MetaDisposable)], dispose: [MetaDisposable], cancel: [PeerActivitySpace]) {
         var start: [(PeerActivitySpace, PeerInputActivityRecord?, MetaDisposable)] = []
         var dispose: [MetaDisposable] = []
+        var cancel: [PeerActivitySpace] = []
         
         var validPeerIds = Set<PeerActivitySpace>()
         for (peerId, record) in activities {
@@ -60,11 +61,15 @@ private final class ManagedLocalTypingActivitiesContext {
         }
         
         for peerId in removePeerIds {
-            dispose.append(self.disposables[peerId]!.1)
+            let record = self.disposables[peerId]!
+            dispose.append(record.1)
+            if isUploadProgressActivity(record.0.activity) {
+                cancel.append(peerId)
+            }
             self.disposables.removeValue(forKey: peerId)
         }
         
-        return (start, dispose)
+        return (start, dispose, cancel)
     }
     
     func dispose() {
@@ -75,16 +80,48 @@ private final class ManagedLocalTypingActivitiesContext {
     }
 }
 
-func managedLocalTypingActivities(activities: Signal<[PeerActivitySpace: [(PeerId, PeerInputActivityRecord)]], NoError>, postbox: Postbox, network: Network, accountPeerId: PeerId) -> Signal<Void, NoError> {
+private func isUploadProgressActivity(_ activity: PeerInputActivity?) -> Bool {
+    guard let activity else {
+        return false
+    }
+    switch activity {
+    case .uploadingFile, .uploadingPhoto, .uploadingVideo, .uploadingInstantVideo:
+        return true
+    default:
+        return false
+    }
+}
+
+func managedLocalTypingActivities(activities: Signal<[PeerActivitySpace: [(PeerId, PeerInputActivityRecord)]], NoError>, postbox: Postbox, network: Network, accountPeerId: PeerId, shouldSendUploadProgress: Signal<Bool, NoError>) -> Signal<Void, NoError> {
     return Signal { subscriber in
         let context = Atomic(value: ManagedLocalTypingActivitiesContext())
-        let disposable = activities.start(next: { activities in
-            let (start, dispose) = context.with { context in
-                return context.update(activities: activities)
+        let disposable = combineLatest(activities, shouldSendUploadProgress |> distinctUntilChanged).start(next: { activities, shouldSendUploadProgress in
+            let filteredActivities: [PeerActivitySpace: [(PeerId, PeerInputActivityRecord)]]
+            if shouldSendUploadProgress {
+                filteredActivities = activities
+            } else {
+                filteredActivities = activities.compactMapValues { peerActivities -> [(PeerId, PeerInputActivityRecord)]? in
+                    let filteredPeerActivities = peerActivities.filter { !isUploadProgressActivity($0.1.activity) }
+                    return filteredPeerActivities.isEmpty ? nil : filteredPeerActivities
+                }
+            }
+            let (start, dispose, cancel) = context.with { context in
+                return context.update(activities: filteredActivities)
             }
             
             for disposable in dispose {
                 disposable.dispose()
+            }
+
+            for peerId in cancel {
+                var threadId: Int64?
+                switch peerId.category {
+                case let .thread(id):
+                    threadId = id
+                default:
+                    break
+                }
+                let _ = requestActivity(postbox: postbox, network: network, accountPeerId: accountPeerId, peerId: peerId.peerId, threadId: threadId, activity: nil).start()
             }
             
             for (peerId, activity, disposable) in start {

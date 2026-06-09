@@ -119,6 +119,7 @@ func inputTextPanelStateForChatPresentationInterfaceState(_ chatPresentationInte
     var canSendTextMessages = true
     
     var accessoryItems: [ChatTextInputAccessoryItem] = []
+    let ayuGramInputControls = context.ayuGramInputControls
     
     if let peer = chatPresentationInterfaceState.renderedPeer?.peer as? TelegramSecretChat {
         var extendedSearchLayout = false
@@ -153,7 +154,9 @@ func inputTextPanelStateForChatPresentationInterfaceState(_ chatPresentationInte
         if case .scheduledMessages = chatPresentationInterfaceState.subject {
         } else if chatPresentationInterfaceState.renderedPeer?.peerId != context.account.peerId {
             if currentAutoremoveTimeout != nil || chatPresentationInterfaceState.renderedPeer?.peer is TelegramSecretChat {
-                accessoryItems.append(.messageAutoremoveTimeout(currentAutoremoveTimeout))
+                if ayuGramInputControls.showAutoDeleteButtonInMessageField {
+                    accessoryItems.append(.messageAutoremoveTimeout(currentAutoremoveTimeout))
+                }
             }
         }
     }
@@ -166,7 +169,9 @@ func inputTextPanelStateForChatPresentationInterfaceState(_ chatPresentationInte
             return ChatTextInputPanelState(accessoryItems: [.botInput(isEnabled: true, inputMode: .keyboard)], contextPlaceholder: contextPlaceholder, mediaRecordingState: chatPresentationInterfaceState.inputTextPanelState.mediaRecordingState)
         case .none, .text:
             if let _ = chatPresentationInterfaceState.interfaceState.editMessage {
-                accessoryItems.append(.input(isEnabled: true, inputMode: .emoji))
+                if ayuGramInputControls.showEmojiButtonInMessageField {
+                    accessoryItems.append(.input(isEnabled: true, inputMode: .emoji))
+                }
                 
                 return ChatTextInputPanelState(accessoryItems: accessoryItems, contextPlaceholder: contextPlaceholder, mediaRecordingState: chatPresentationInterfaceState.inputTextPanelState.mediaRecordingState)
             } else {
@@ -188,9 +193,13 @@ func inputTextPanelStateForChatPresentationInterfaceState(_ chatPresentationInte
                     if case .scheduledMessages = chatPresentationInterfaceState.subject {
                     } else if chatPresentationInterfaceState.renderedPeer?.peerId != context.account.peerId {
                         if let peer = chatPresentationInterfaceState.renderedPeer?.peer as? TelegramSecretChat, chatPresentationInterfaceState.interfaceState.composeInputState.inputText.length == 0 {
-                            accessoryItems.append(.messageAutoremoveTimeout(peer.messageAutoremoveTimeout))
+                            if ayuGramInputControls.showAutoDeleteButtonInMessageField {
+                                accessoryItems.append(.messageAutoremoveTimeout(peer.messageAutoremoveTimeout))
+                            }
                         } else if currentAutoremoveTimeout != nil && chatPresentationInterfaceState.interfaceState.composeInputState.inputText.length == 0 {
-                            accessoryItems.append(.messageAutoremoveTimeout(currentAutoremoveTimeout))
+                            if ayuGramInputControls.showAutoDeleteButtonInMessageField {
+                                accessoryItems.append(.messageAutoremoveTimeout(currentAutoremoveTimeout))
+                            }
                         }
                     }
                 }
@@ -208,7 +217,7 @@ func inputTextPanelStateForChatPresentationInterfaceState(_ chatPresentationInte
                             showPremiumGift = true
                         }
                     }
-                    if isTextEmpty, showPremiumGift, let peer = chatPresentationInterfaceState.renderedPeer?.peer as? TelegramUser, !peer.isDeleted && peer.botInfo == nil && !peer.flags.contains(.isSupport) { //&& chatPresentationInterfaceState.suggestPremiumGift {
+                    if ayuGramInputControls.showGiftButtonInMessageField, isTextEmpty, showPremiumGift, let peer = chatPresentationInterfaceState.renderedPeer?.peer as? TelegramUser, !peer.isDeleted && peer.botInfo == nil && !peer.flags.contains(.isSupport) { //&& chatPresentationInterfaceState.suggestPremiumGift {
                         accessoryItems.append(.gift)
                     }
                 }
@@ -253,20 +262,22 @@ func inputTextPanelStateForChatPresentationInterfaceState(_ chatPresentationInte
                     }
                 }
                 
-                if isTextEmpty && chatPresentationInterfaceState.hasBots && chatPresentationInterfaceState.hasBotCommands && !hasForward {
+                if ayuGramInputControls.showCommandsButtonInMessageField && isTextEmpty && chatPresentationInterfaceState.hasBots && chatPresentationInterfaceState.hasBotCommands && !hasForward {
                     accessoryItems.append(.commands)
                 }
                 
-                if !canSendTextMessages {
-                    if stickersEnabled && !stickersAreEmoji && !hasForward {
-                        accessoryItems.append(.input(isEnabled: true, inputMode: .stickers))
-                    }
-                } else {
-                    stickersAreEmoji = stickersAreEmoji || hasForward
-                    if stickersEnabled {
-                        accessoryItems.append(.input(isEnabled: true, inputMode: stickersAreEmoji ? .emoji : .stickers))
+                if ayuGramInputControls.showEmojiButtonInMessageField {
+                    if !canSendTextMessages {
+                        if stickersEnabled && !stickersAreEmoji && !hasForward {
+                            accessoryItems.append(.input(isEnabled: true, inputMode: .stickers))
+                        }
                     } else {
-                        accessoryItems.append(.input(isEnabled: true, inputMode: .emoji))
+                        stickersAreEmoji = stickersAreEmoji || hasForward
+                        if stickersEnabled {
+                            accessoryItems.append(.input(isEnabled: true, inputMode: stickersAreEmoji ? .emoji : .stickers))
+                        } else {
+                            accessoryItems.append(.input(isEnabled: true, inputMode: .emoji))
+                        }
                     }
                 }
                 

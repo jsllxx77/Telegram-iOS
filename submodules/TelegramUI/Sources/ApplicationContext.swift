@@ -33,6 +33,7 @@ import PhoneNumberFormat
 import AttachmentUI
 import MinimizedContainer
 import BrowserUI
+import AyuGramCore
 
 final class UnauthorizedApplicationContext {
     let sharedContext: SharedAccountContextImpl
@@ -152,6 +153,7 @@ final class AuthorizedApplicationContext {
     private var applicationInForegroundDisposable: Disposable?
     
     private var showCallsTab: Bool
+    private var showContactsTab: Bool
     private var showCallsTabDisposable: Disposable?
     private var enablePostboxTransactionsDiposable: Disposable?
     
@@ -167,6 +169,7 @@ final class AuthorizedApplicationContext {
         self.context = context
         
         self.showCallsTab = showCallsTab
+        self.showContactsTab = true
         
         self.notificationController = NotificationContainerController(context: context)
         
@@ -806,19 +809,21 @@ final class AuthorizedApplicationContext {
             }
         })
         
-        let showCallsTabSignal = context.sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.callListSettings])
-        |> map { sharedData -> Bool in
+        let rootTabsSignal = context.sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.callListSettings, ApplicationSpecificSharedDataKeys.ayuGramSettings])
+        |> map { sharedData -> (showCallsTab: Bool, showContactsTab: Bool) in
             var value = CallListSettings.defaultSettings.showTab
             if let settings = sharedData.entries[ApplicationSpecificSharedDataKeys.callListSettings]?.get(CallListSettings.self) {
                 value = settings.showTab
             }
-            return value
+            let ayuSettings = ayuGramSettings(sharedData: sharedData)
+            return (value && ayuSettings.showCallsInDrawer, ayuSettings.showContactsInDrawer)
         }
-        self.showCallsTabDisposable = (showCallsTabSignal |> deliverOnMainQueue).start(next: { [weak self] value in
+        self.showCallsTabDisposable = (rootTabsSignal |> deliverOnMainQueue).start(next: { [weak self] value in
             if let strongSelf = self {
-                if strongSelf.showCallsTab != value {
-                    strongSelf.showCallsTab = value
-                    strongSelf.rootController.updateRootControllers(showCallsTab: value)
+                if strongSelf.showCallsTab != value.showCallsTab || strongSelf.showContactsTab != value.showContactsTab {
+                    strongSelf.showCallsTab = value.showCallsTab
+                    strongSelf.showContactsTab = value.showContactsTab
+                    strongSelf.rootController.updateRootControllers(showCallsTab: value.showCallsTab, showContactsTab: value.showContactsTab)
                 }
             }
         })

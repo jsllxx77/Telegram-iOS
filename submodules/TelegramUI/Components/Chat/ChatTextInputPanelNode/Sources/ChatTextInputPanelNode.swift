@@ -1541,7 +1541,8 @@ public class ChatTextInputPanelNode: ChatInputPanelNode, ASEditableTextNodeDeleg
             }
         }
         
-        var displayMediaButton = true
+        let ayuGramInputControls = self.context?.ayuGramInputControls ?? .default
+        var displayMediaButton = ayuGramInputControls.showAttachButtonInMessageField
         if case let .customChatContents(customChatContents) = interfaceState.subject {
             switch customChatContents.kind {
             case .hashTagSearch:
@@ -1561,9 +1562,9 @@ public class ChatTextInputPanelNode: ChatInputPanelNode, ASEditableTextNodeDeleg
         }
         
         transition.updateAlpha(layer: self.attachmentButtonBackground.layer, alpha: attachmentButtonAlpha)
-        self.attachmentButton.isEnabled = isMediaEnabled && !isRecording
+        self.attachmentButton.isEnabled = displayMediaButton && isMediaEnabled && !isRecording
         self.attachmentButton.accessibilityTraits = (!isSlowmodeActive || isMediaEnabled) ? [.button] : [.button, .notEnabled]
-        self.attachmentButtonDisabledNode.isHidden = !isSlowmodeActive || isMediaEnabled
+        self.attachmentButtonDisabledNode.isHidden = !displayMediaButton || !isSlowmodeActive || isMediaEnabled
         
         let canBypassRestrictions = canBypassRestrictions(chatPresentationInterfaceState: interfaceState)
         
@@ -3551,7 +3552,7 @@ public class ChatTextInputPanelNode: ChatInputPanelNode, ASEditableTextNodeDeleg
             )
         }
         
-        if self.isAIEnabled {
+        if self.isAIEnabled && ayuGramInputControls.showAiEditorButtonInMessageField {
             let aiButton: (button: HighlightTrackingButton, icon: UIImageView)
             if let current = self.aiButton {
                 aiButton = current
@@ -4625,6 +4626,9 @@ public class ChatTextInputPanelNode: ChatInputPanelNode, ASEditableTextNodeDeleg
                 }
             }
         }
+        if !(self.context?.ayuGramInputControls.showMicrophoneButtonInMessageField ?? true) {
+            hideMicButton = true
+        }
         
         if hideMicButton || (mediaInputIsActive && !hideExpandMediaInput) {
             if !self.mediaActionButtons.micButton.alpha.isZero {
@@ -5404,6 +5408,10 @@ public class ChatTextInputPanelNode: ChatInputPanelNode, ASEditableTextNodeDeleg
             self.audioRecordingRemoveAnimationState = .previewToAttachButton
             self.interfaceInteraction?.deleteRecordedMedia()
         } else {
+            let ayuGramInputControls = self.context?.ayuGramInputControls ?? .default
+            if !ayuGramInputControls.showAttachButtonInMessageField || !ayuGramInputControls.showAttachPopup {
+                return
+            }
             self.displayAttachmentMenu()
         }
     }
@@ -5504,6 +5512,9 @@ public class ChatTextInputPanelNode: ChatInputPanelNode, ASEditableTextNodeDeleg
                             }
                         case .stickers, .emoji:
                             if isEnabled {
+                                if !(self.context?.ayuGramInputControls.showEmojiPopup ?? true) {
+                                    return
+                                }
                                 self.interfaceInteraction?.openStickers()
                             } else {
                                 self.interfaceInteraction?.displayRestrictedInfo(.stickers, .tooltip)

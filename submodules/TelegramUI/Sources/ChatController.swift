@@ -6607,7 +6607,18 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
             }
             let settings = ayuGramSettings(sharedData: sharedData)
             let previousSettings = self.ayuGramSettingsValue.swap(settings)
-            if previousSettings.hidePremiumStatuses != settings.hidePremiumStatuses && self.isNodeLoaded {
+            let needsInputControlsRefresh =
+                previousSettings.hidePremiumStatuses != settings.hidePremiumStatuses ||
+                previousSettings.showAttachButtonInMessageField != settings.showAttachButtonInMessageField ||
+                previousSettings.showCommandsButtonInMessageField != settings.showCommandsButtonInMessageField ||
+                previousSettings.showEmojiButtonInMessageField != settings.showEmojiButtonInMessageField ||
+                previousSettings.showMicrophoneButtonInMessageField != settings.showMicrophoneButtonInMessageField ||
+                previousSettings.showAutoDeleteButtonInMessageField != settings.showAutoDeleteButtonInMessageField ||
+                previousSettings.showGiftButtonInMessageField != settings.showGiftButtonInMessageField ||
+                previousSettings.showAiEditorButtonInMessageField != settings.showAiEditorButtonInMessageField ||
+                previousSettings.showAttachPopup != settings.showAttachPopup ||
+                previousSettings.showEmojiPopup != settings.showEmojiPopup
+            if needsInputControlsRefresh && self.isNodeLoaded {
                 self.updateChatPresentationInterfaceState(animated: false, interactive: false, { $0 })
             }
         })

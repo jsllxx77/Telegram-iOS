@@ -26,6 +26,12 @@ import AppBundle
 import DirectMediaImageCache
 import AyuGramCore
 
+private struct AyuGramContextDisplaySettings: Equatable {
+    var hidePremiumStatuses: Bool
+    var inputControls: AyuGramInputControls
+    var drawerControls: AyuGramDrawerControls
+}
+
 private final class DeviceSpecificContactImportContext {
     let disposable = MetaDisposable()
     var reference: DeviceContactBasicDataWithReference?
@@ -174,6 +180,8 @@ public final class AccountContextImpl: AccountContext {
     private var ayuGramMessageHistoryPolicyDisposable: Disposable?
     private var ayuGramDisplaySettingsDisposable: Disposable?
     public private(set) var isAyuGramPremiumStatusHidden: Bool = false
+    public private(set) var ayuGramInputControls: AyuGramInputControls = .default
+    public private(set) var ayuGramDrawerControls: AyuGramDrawerControls = .default
     
     public let cachedGroupCallContexts: AccountGroupCallContextCache
     
@@ -548,13 +556,44 @@ public final class AccountContextImpl: AccountContext {
         })
 
         self.ayuGramDisplaySettingsDisposable = (sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.ayuGramSettings])
-        |> map { sharedData -> Bool in
+        |> map { sharedData -> AyuGramContextDisplaySettings in
             let settings = ayuGramSettings(sharedData: sharedData)
-            return settings.hidePremiumStatuses
+            return AyuGramContextDisplaySettings(
+                hidePremiumStatuses: settings.hidePremiumStatuses,
+                inputControls: AyuGramInputControls(
+                    showAttachButtonInMessageField: settings.showAttachButtonInMessageField,
+                    showCommandsButtonInMessageField: settings.showCommandsButtonInMessageField,
+                    showEmojiButtonInMessageField: settings.showEmojiButtonInMessageField,
+                    showMicrophoneButtonInMessageField: settings.showMicrophoneButtonInMessageField,
+                    showAutoDeleteButtonInMessageField: settings.showAutoDeleteButtonInMessageField,
+                    showGiftButtonInMessageField: settings.showGiftButtonInMessageField,
+                    showAiEditorButtonInMessageField: settings.showAiEditorButtonInMessageField,
+                    showAttachPopup: settings.showAttachPopup,
+                    showEmojiPopup: settings.showEmojiPopup
+                ),
+                drawerControls: AyuGramDrawerControls(
+                    showMyProfileInDrawer: settings.showMyProfileInDrawer,
+                    showBotsInDrawer: settings.showBotsInDrawer,
+                    showNewGroupInDrawer: settings.showNewGroupInDrawer,
+                    showNewChannelInDrawer: settings.showNewChannelInDrawer,
+                    showContactsInDrawer: settings.showContactsInDrawer,
+                    showCallsInDrawer: settings.showCallsInDrawer,
+                    showSavedMessagesInDrawer: settings.showSavedMessagesInDrawer,
+                    showLReadToggleInDrawer: settings.showLReadToggleInDrawer,
+                    showSReadToggleInDrawer: settings.showSReadToggleInDrawer,
+                    showNightModeToggleInDrawer: settings.showNightModeToggleInDrawer,
+                    showGhostToggleInDrawer: settings.showGhostToggleInDrawer,
+                    showStreamerToggleInDrawer: settings.showStreamerToggleInDrawer,
+                    showGhostToggleInTray: settings.showGhostToggleInTray,
+                    showStreamerToggleInTray: settings.showStreamerToggleInTray
+                )
+            )
         }
         |> distinctUntilChanged
         |> deliverOnMainQueue).start(next: { [weak self] value in
-            self?.isAyuGramPremiumStatusHidden = value
+            self?.isAyuGramPremiumStatusHidden = value.hidePremiumStatuses
+            self?.ayuGramInputControls = value.inputControls
+            self?.ayuGramDrawerControls = value.drawerControls
         })
     }
     

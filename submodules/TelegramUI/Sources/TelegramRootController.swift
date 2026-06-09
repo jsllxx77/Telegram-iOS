@@ -214,9 +214,11 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         contactsController.switchToChatsController = {  [weak self] in
             self?.openChatsController(activateSearch: false)
         }
-        controllers.append(contactsController)
+        if self.context.ayuGramDrawerControls.showContactsInDrawer {
+            controllers.append(contactsController)
+        }
         
-        if showCallsTab {
+        if showCallsTab && self.context.ayuGramDrawerControls.showCallsInDrawer {
             controllers.append(callListController)
         }
         controllers.append(chatListController)
@@ -250,12 +252,15 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         self.pushViewController(tabBarController, animated: false)
     }
         
-    public func updateRootControllers(showCallsTab: Bool) {
+    public func updateRootControllers(showCallsTab: Bool, showContactsTab: Bool? = nil) {
         guard let rootTabController = self.rootTabController as? TabBarControllerImpl else {
             return
         }
+        let effectiveShowContactsTab = showContactsTab ?? self.context.ayuGramDrawerControls.showContactsInDrawer
         var controllers: [ViewController] = []
-        controllers.append(self.contactsController!)
+        if effectiveShowContactsTab {
+            controllers.append(self.contactsController!)
+        }
         if showCallsTab {
             controllers.append(self.callListController!)
         }

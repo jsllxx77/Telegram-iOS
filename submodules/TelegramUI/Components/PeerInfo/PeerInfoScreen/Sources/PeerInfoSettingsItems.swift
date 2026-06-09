@@ -37,6 +37,7 @@ func settingsItems(data: PeerInfoScreenData?, context: AccountContext, presentat
     for section in SettingsSection.allCases {
         items[section] = []
     }
+    let ayuGramDrawerControls = context.ayuGramDrawerControls
     
     let setPhotoTitle: String
     if let peer = data.peer, !peer.profileImageRepresentations.isEmpty {
@@ -148,9 +149,11 @@ func settingsItems(data: PeerInfoScreenData?, context: AccountContext, presentat
             }))
         }
         
-        items[.myProfile]!.append(PeerInfoScreenDisclosureItem(id: 0, text: presentationData.strings.Settings_MyProfile, icon: PresentationResourcesSettings.myProfile, action: {
-            interaction.openSettings(.profile)
-        }))
+        if ayuGramDrawerControls.showMyProfileInDrawer {
+            items[.myProfile]!.append(PeerInfoScreenDisclosureItem(id: 0, text: presentationData.strings.Settings_MyProfile, icon: PresentationResourcesSettings.myProfile, action: {
+                interaction.openSettings(.profile)
+            }))
+        }
         
         if !settings.proxySettings.servers.isEmpty {
             let proxyType: String
@@ -171,7 +174,7 @@ func settingsItems(data: PeerInfoScreenData?, context: AccountContext, presentat
     }
     
     var appIndex = 1000
-    if let settings = data.globalSettings {
+    if ayuGramDrawerControls.showBotsInDrawer, let settings = data.globalSettings {
         for bot in settings.bots {
             let iconSignal: Signal<UIImage?, NoError>
             if let peer = PeerReference(bot.peer), let icon = bot.icons[.iOSSettingsStatic] {
@@ -197,12 +200,16 @@ func settingsItems(data: PeerInfoScreenData?, context: AccountContext, presentat
         }
     }
     
-    items[.shortcuts]!.append(PeerInfoScreenDisclosureItem(id: 1, text: presentationData.strings.Settings_SavedMessages, icon: PresentationResourcesSettings.savedMessages, action: {
-        interaction.openSettings(.savedMessages)
-    }))
-    items[.shortcuts]!.append(PeerInfoScreenDisclosureItem(id: 2, text: presentationData.strings.CallSettings_RecentCalls, icon: PresentationResourcesSettings.recentCalls, action: {
-        interaction.openSettings(.recentCalls)
-    }))
+    if ayuGramDrawerControls.showSavedMessagesInDrawer {
+        items[.shortcuts]!.append(PeerInfoScreenDisclosureItem(id: 1, text: presentationData.strings.Settings_SavedMessages, icon: PresentationResourcesSettings.savedMessages, action: {
+            interaction.openSettings(.savedMessages)
+        }))
+    }
+    if ayuGramDrawerControls.showCallsInDrawer {
+        items[.shortcuts]!.append(PeerInfoScreenDisclosureItem(id: 2, text: presentationData.strings.CallSettings_RecentCalls, icon: PresentationResourcesSettings.recentCalls, action: {
+            interaction.openSettings(.recentCalls)
+        }))
+    }
     
     let devicesLabel: String
     if let settings = data.globalSettings, let otherSessionsCount = settings.otherSessionsCount {

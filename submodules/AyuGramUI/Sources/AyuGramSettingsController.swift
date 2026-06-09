@@ -29,6 +29,8 @@ private enum AyuGramSettingsSection: Int32 {
     case filters
     case appearance
     case chatControls
+    case composer
+    case drawer
     case translation
     case advanced
 }
@@ -68,6 +70,33 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
     case hideNotificationBadge(Bool)
     case hideAllChatsFolder(Bool)
 
+    case composerHeader
+    case showAttachButtonInMessageField(Bool)
+    case showCommandsButtonInMessageField(Bool)
+    case showEmojiButtonInMessageField(Bool)
+    case showMicrophoneButtonInMessageField(Bool)
+    case showAutoDeleteButtonInMessageField(Bool)
+    case showGiftButtonInMessageField(Bool)
+    case showAiEditorButtonInMessageField(Bool)
+    case showAttachPopup(Bool)
+    case showEmojiPopup(Bool)
+
+    case drawerHeader
+    case showMyProfileInDrawer(Bool)
+    case showBotsInDrawer(Bool)
+    case showNewGroupInDrawer(Bool)
+    case showNewChannelInDrawer(Bool)
+    case showContactsInDrawer(Bool)
+    case showCallsInDrawer(Bool)
+    case showSavedMessagesInDrawer(Bool)
+    case showLReadToggleInDrawer(Bool)
+    case showSReadToggleInDrawer(Bool)
+    case showNightModeToggleInDrawer(Bool)
+    case showGhostToggleInDrawer(Bool)
+    case showStreamerToggleInDrawer(Bool)
+    case showGhostToggleInTray(Bool)
+    case showStreamerToggleInTray(Bool)
+
     case translationHeader
     case translationProvider(AyuTranslationProvider)
 
@@ -86,6 +115,10 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return AyuGramSettingsSection.appearance.rawValue
         case .chatControlsHeader, .hideFastShare, .showPeerId, .showMessageSeconds, .hideSimilarChannels, .disableOpenLinkWarning, .disableAds, .disableStories, .hidePremiumStatuses, .hideNotificationCounters, .hideNotificationBadge, .hideAllChatsFolder:
             return AyuGramSettingsSection.chatControls.rawValue
+        case .composerHeader, .showAttachButtonInMessageField, .showCommandsButtonInMessageField, .showEmojiButtonInMessageField, .showMicrophoneButtonInMessageField, .showAutoDeleteButtonInMessageField, .showGiftButtonInMessageField, .showAiEditorButtonInMessageField, .showAttachPopup, .showEmojiPopup:
+            return AyuGramSettingsSection.composer.rawValue
+        case .drawerHeader, .showMyProfileInDrawer, .showBotsInDrawer, .showNewGroupInDrawer, .showNewChannelInDrawer, .showContactsInDrawer, .showCallsInDrawer, .showSavedMessagesInDrawer, .showLReadToggleInDrawer, .showSReadToggleInDrawer, .showNightModeToggleInDrawer, .showGhostToggleInDrawer, .showStreamerToggleInDrawer, .showGhostToggleInTray, .showStreamerToggleInTray:
+            return AyuGramSettingsSection.drawer.rawValue
         case .translationHeader, .translationProvider:
             return AyuGramSettingsSection.translation.rawValue
         case .advancedHeader, .crashReporting:
@@ -153,6 +186,56 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return 410
         case .hideAllChatsFolder:
             return 411
+        case .composerHeader:
+            return 450
+        case .showAttachButtonInMessageField:
+            return 451
+        case .showCommandsButtonInMessageField:
+            return 452
+        case .showEmojiButtonInMessageField:
+            return 453
+        case .showMicrophoneButtonInMessageField:
+            return 454
+        case .showAutoDeleteButtonInMessageField:
+            return 455
+        case .showGiftButtonInMessageField:
+            return 456
+        case .showAiEditorButtonInMessageField:
+            return 457
+        case .showAttachPopup:
+            return 458
+        case .showEmojiPopup:
+            return 459
+        case .drawerHeader:
+            return 470
+        case .showMyProfileInDrawer:
+            return 471
+        case .showBotsInDrawer:
+            return 472
+        case .showNewGroupInDrawer:
+            return 473
+        case .showNewChannelInDrawer:
+            return 474
+        case .showContactsInDrawer:
+            return 475
+        case .showCallsInDrawer:
+            return 476
+        case .showSavedMessagesInDrawer:
+            return 477
+        case .showLReadToggleInDrawer:
+            return 478
+        case .showSReadToggleInDrawer:
+            return 479
+        case .showNightModeToggleInDrawer:
+            return 480
+        case .showGhostToggleInDrawer:
+            return 481
+        case .showStreamerToggleInDrawer:
+            return 482
+        case .showGhostToggleInTray:
+            return 483
+        case .showStreamerToggleInTray:
+            return 484
         case .translationHeader:
             return 500
         case .translationProvider:
@@ -260,6 +343,58 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
         case let .hideAllChatsFolder(value):
             return ayuGramSwitchItem(presentationData: presentationData, title: "Hide All Chats Folder", value: value, section: self.section, arguments: arguments, keyPath: \.hideAllChatsFolder)
 
+        case .composerHeader:
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: "COMPOSER", sectionId: self.section)
+        case let .showAttachButtonInMessageField(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "Attach Button", value: value, section: self.section, arguments: arguments, keyPath: \.showAttachButtonInMessageField)
+        case let .showCommandsButtonInMessageField(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "Commands Button", value: value, section: self.section, arguments: arguments, keyPath: \.showCommandsButtonInMessageField)
+        case let .showEmojiButtonInMessageField(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "Emoji Button", value: value, section: self.section, arguments: arguments, keyPath: \.showEmojiButtonInMessageField)
+        case let .showMicrophoneButtonInMessageField(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "Microphone Button", value: value, section: self.section, arguments: arguments, keyPath: \.showMicrophoneButtonInMessageField)
+        case let .showAutoDeleteButtonInMessageField(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "Auto-Delete Button", value: value, section: self.section, arguments: arguments, keyPath: \.showAutoDeleteButtonInMessageField)
+        case let .showGiftButtonInMessageField(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "Gift Button", value: value, section: self.section, arguments: arguments, keyPath: \.showGiftButtonInMessageField)
+        case let .showAiEditorButtonInMessageField(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "AI Editor Button", value: value, section: self.section, arguments: arguments, keyPath: \.showAiEditorButtonInMessageField)
+        case let .showAttachPopup(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "Attach Popup", value: value, section: self.section, arguments: arguments, keyPath: \.showAttachPopup)
+        case let .showEmojiPopup(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "Emoji Popup", value: value, section: self.section, arguments: arguments, keyPath: \.showEmojiPopup)
+
+        case .drawerHeader:
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: "DRAWER", sectionId: self.section)
+        case let .showMyProfileInDrawer(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "My Profile", value: value, section: self.section, arguments: arguments, keyPath: \.showMyProfileInDrawer)
+        case let .showBotsInDrawer(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "Bots", value: value, section: self.section, arguments: arguments, keyPath: \.showBotsInDrawer)
+        case let .showNewGroupInDrawer(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "New Group", value: value, section: self.section, arguments: arguments, keyPath: \.showNewGroupInDrawer)
+        case let .showNewChannelInDrawer(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "New Channel", value: value, section: self.section, arguments: arguments, keyPath: \.showNewChannelInDrawer)
+        case let .showContactsInDrawer(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "Contacts", value: value, section: self.section, arguments: arguments, keyPath: \.showContactsInDrawer)
+        case let .showCallsInDrawer(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "Calls", value: value, section: self.section, arguments: arguments, keyPath: \.showCallsInDrawer)
+        case let .showSavedMessagesInDrawer(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "Saved Messages", value: value, section: self.section, arguments: arguments, keyPath: \.showSavedMessagesInDrawer)
+        case let .showLReadToggleInDrawer(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "Local Read Toggle", value: value, section: self.section, arguments: arguments, keyPath: \.showLReadToggleInDrawer)
+        case let .showSReadToggleInDrawer(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "Server Read Toggle", value: value, section: self.section, arguments: arguments, keyPath: \.showSReadToggleInDrawer)
+        case let .showNightModeToggleInDrawer(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "Night Mode Toggle", value: value, section: self.section, arguments: arguments, keyPath: \.showNightModeToggleInDrawer)
+        case let .showGhostToggleInDrawer(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "Ghost Toggle", value: value, section: self.section, arguments: arguments, keyPath: \.showGhostToggleInDrawer)
+        case let .showStreamerToggleInDrawer(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "Streamer Toggle", value: value, section: self.section, arguments: arguments, keyPath: \.showStreamerToggleInDrawer)
+        case let .showGhostToggleInTray(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "Ghost Tray Toggle", value: value, section: self.section, arguments: arguments, keyPath: \.showGhostToggleInTray)
+        case let .showStreamerToggleInTray(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "Streamer Tray Toggle", value: value, section: self.section, arguments: arguments, keyPath: \.showStreamerToggleInTray)
+
         case .translationHeader:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: "TRANSLATION", sectionId: self.section)
         case let .translationProvider(value):
@@ -328,6 +463,33 @@ private func ayuGramSettingsControllerEntries(settings: AyuGramSettings) -> [Ayu
     entries.append(.hideNotificationCounters(settings.hideNotificationCounters))
     entries.append(.hideNotificationBadge(settings.hideNotificationBadge))
     entries.append(.hideAllChatsFolder(settings.hideAllChatsFolder))
+
+    entries.append(.composerHeader)
+    entries.append(.showAttachButtonInMessageField(settings.showAttachButtonInMessageField))
+    entries.append(.showCommandsButtonInMessageField(settings.showCommandsButtonInMessageField))
+    entries.append(.showEmojiButtonInMessageField(settings.showEmojiButtonInMessageField))
+    entries.append(.showMicrophoneButtonInMessageField(settings.showMicrophoneButtonInMessageField))
+    entries.append(.showAutoDeleteButtonInMessageField(settings.showAutoDeleteButtonInMessageField))
+    entries.append(.showGiftButtonInMessageField(settings.showGiftButtonInMessageField))
+    entries.append(.showAiEditorButtonInMessageField(settings.showAiEditorButtonInMessageField))
+    entries.append(.showAttachPopup(settings.showAttachPopup))
+    entries.append(.showEmojiPopup(settings.showEmojiPopup))
+
+    entries.append(.drawerHeader)
+    entries.append(.showMyProfileInDrawer(settings.showMyProfileInDrawer))
+    entries.append(.showBotsInDrawer(settings.showBotsInDrawer))
+    entries.append(.showNewGroupInDrawer(settings.showNewGroupInDrawer))
+    entries.append(.showNewChannelInDrawer(settings.showNewChannelInDrawer))
+    entries.append(.showContactsInDrawer(settings.showContactsInDrawer))
+    entries.append(.showCallsInDrawer(settings.showCallsInDrawer))
+    entries.append(.showSavedMessagesInDrawer(settings.showSavedMessagesInDrawer))
+    entries.append(.showLReadToggleInDrawer(settings.showLReadToggleInDrawer))
+    entries.append(.showSReadToggleInDrawer(settings.showSReadToggleInDrawer))
+    entries.append(.showNightModeToggleInDrawer(settings.showNightModeToggleInDrawer))
+    entries.append(.showGhostToggleInDrawer(settings.showGhostToggleInDrawer))
+    entries.append(.showStreamerToggleInDrawer(settings.showStreamerToggleInDrawer))
+    entries.append(.showGhostToggleInTray(settings.showGhostToggleInTray))
+    entries.append(.showStreamerToggleInTray(settings.showStreamerToggleInTray))
 
     entries.append(.translationHeader)
     entries.append(.translationProvider(settings.translationProvider))

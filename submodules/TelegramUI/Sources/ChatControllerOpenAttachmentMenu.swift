@@ -50,6 +50,9 @@ extension ChatControllerImpl {
         guard self.audioRecorderValue == nil && self.videoRecorderValue == nil else {
             return
         }
+        if case .default = subject, !self.context.ayuGramInputControls.showAttachPopup {
+            return
+        }
 
         let context = self.context
         let inputIsActive = self.presentationInterfaceState.inputMode == .text

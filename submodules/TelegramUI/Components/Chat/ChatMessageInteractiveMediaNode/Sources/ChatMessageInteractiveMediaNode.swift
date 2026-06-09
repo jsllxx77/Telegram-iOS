@@ -1114,6 +1114,7 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
                     context: context,
                     presentationData: presentationData,
                     edited: dateAndStatus.edited && !presentationData.isPreview,
+                    replaceEditedWithIcon: associatedData.ayuGramData.replaceBottomInfoWithIcons,
                     impressionCount: !presentationData.isPreview ? dateAndStatus.viewCount : nil,
                     dateText: dateAndStatus.dateText,
                     type: dateAndStatus.type,

@@ -951,6 +951,7 @@ public final class ChatMessageInteractiveFileNode: ASDisplayNode {
                         context: arguments.context,
                         presentationData: arguments.presentationData,
                         edited: edited && !arguments.presentationData.isPreview,
+                        replaceEditedWithIcon: arguments.associatedData.ayuGramData.replaceBottomInfoWithIcons,
                         impressionCount: !arguments.presentationData.isPreview ? viewCount : nil,
                         dateText: dateText,
                         type: statusType,

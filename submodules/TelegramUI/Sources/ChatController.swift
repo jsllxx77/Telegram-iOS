@@ -147,6 +147,20 @@ import ChatSearchNavigationContentNode
 import ChatAgeRestrictionAlertController
 import TextProcessingScreen
 
+private func ayuGramChatBubbleCorners(base: PresentationChatBubbleCorners, settings: AyuGramSettings) -> PresentationChatBubbleCorners {
+    let mainRadius = CGFloat(max(0, min(40, settings.messageBubbleRadius)))
+    let auxiliaryRadius: CGFloat
+    let mergeBubbleCorners: Bool
+    if settings.singleCornerRadius {
+        auxiliaryRadius = mainRadius
+        mergeBubbleCorners = false
+    } else {
+        auxiliaryRadius = min(mainRadius, max(0.0, floor(mainRadius * 0.5)))
+        mergeBubbleCorners = base.mergeBubbleCorners
+    }
+    return PresentationChatBubbleCorners(mainRadius: mainRadius, auxiliaryRadius: auxiliaryRadius, mergeBubbleCorners: mergeBubbleCorners, hasTails: !settings.removeMessageTail)
+}
+
 public final class ChatControllerOverlayPresentationData {
     public let expandData: (ASDisplayNode?, () -> Void)
     public init(expandData: (ASDisplayNode?, () -> Void)) {
@@ -6376,6 +6390,11 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
             }
             return themeSettings
         }
+        let ayuGramSettingsSignal = context.sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.ayuGramSettings])
+        |> map { sharedData -> AyuGramSettings in
+            return ayuGramSettings(sharedData: sharedData)
+        }
+        |> distinctUntilChanged
         
         let accountManager = context.sharedContext.accountManager
         let currentChatTheme = Atomic<(ChatTheme?, Bool)?>(value: nil)
@@ -6383,11 +6402,12 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
             queue: Queue.mainQueue(),
             context.sharedContext.presentationData,
             themeSettings,
+            ayuGramSettingsSignal,
             context.engine.themes.getChatThemes(accountManager: accountManager, onlyCached: true),
             chatTheme,
             self.chatThemeAndDarkAppearancePreviewPromise.get(),
             chatWallpaper
-        ).startStrict(next: { [weak self] presentationData, themeSettings, chatThemes, chatTheme, chatThemeAndDarkAppearance, chatWallpaper in
+        ).startStrict(next: { [weak self] presentationData, themeSettings, ayuGramSettings, chatThemes, chatTheme, chatThemeAndDarkAppearance, chatWallpaper in
             if let strongSelf = self {
                 let (chatThemePreview, darkAppearancePreview) = chatThemeAndDarkAppearance
                 
@@ -6396,6 +6416,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
                 let previousTheme = strongSelf.presentationData.theme
                 let previousStrings = strongSelf.presentationData.strings
                 let previousChatWallpaper = strongSelf.presentationData.chatWallpaper
+                let previousChatBubbleCorners = strongSelf.presentationData.chatBubbleCorners
                 
                 var chatTheme = chatTheme
                 if let chatThemePreview {
@@ -6546,6 +6567,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
                 } else if let chatWallpaper {
                     presentationData = presentationData.withUpdated(chatWallpaper: chatWallpaper)
                 }
+                presentationData = presentationData.withChatBubbleCorners(ayuGramChatBubbleCorners(base: presentationData.chatBubbleCorners, settings: ayuGramSettings))
                 
                 let isFirstTime = !strongSelf.didSetPresentationData
                 strongSelf.presentationData = presentationData
@@ -6553,7 +6575,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
                 
                 let previousChatTheme = currentChatTheme.swap((chatTheme, useDarkAppearance))
                 
-                if isFirstTime || previousTheme != presentationData.theme || previousStrings !== presentationData.strings || presentationData.chatWallpaper != previousChatWallpaper {
+                if isFirstTime || previousTheme != presentationData.theme || previousStrings !== presentationData.strings || presentationData.chatWallpaper != previousChatWallpaper || previousChatBubbleCorners != presentationData.chatBubbleCorners {
                     strongSelf.themeAndStringsUpdated()
                     
                     controllerInteraction.updatedPresentationData = strongSelf.updatedPresentationData

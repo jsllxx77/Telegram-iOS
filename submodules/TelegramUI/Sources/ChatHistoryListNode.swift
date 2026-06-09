@@ -2259,7 +2259,9 @@ public final class ChatHistoryListNodeImpl: ListViewImpl, ChatHistoryNode, ChatH
                     showMessageSeconds: ayuGramSettings.showMessageSeconds,
                     hideFastShare: ayuGramSettings.hideFastShare,
                     hideSimilarChannels: ayuGramSettings.hideSimilarChannels,
-                    peerIdDisplay: ayuGramSettings.showPeerId.rawValue
+                    peerIdDisplay: ayuGramSettings.showPeerId.rawValue,
+                    avatarCorners: ayuGramSettings.avatarCorners,
+                    replaceBottomInfoWithIcons: ayuGramSettings.replaceBottomInfoWithIcons
                 )
                 let effectiveRecommendedChannels = ayuGramSettings.hideSimilarChannels ? nil : recommendedChannels
                 let associatedData = extractAssociatedData(chatLocation: chatLocation, view: view, automaticDownloadNetworkType: networkType, preferredStoryHighQuality: preferredStoryHighQuality, animatedEmojiStickers: animatedEmojiStickers, additionalAnimatedEmojiStickers: additionalAnimatedEmojiStickers, subject: subject, currentlyPlayingMessageId: currentlyPlayingMessageIdAndType?.0, isCopyProtectionEnabled: isCopyProtectionEnabled, availableReactions: availableReactions, availableMessageEffects: availableMessageEffects, savedMessageTags: savedMessageTags, defaultReaction: defaultReaction.0, areStarReactionsEnabled: defaultReaction.1, isPremium: isPremium, alwaysDisplayTranscribeButton: alwaysDisplayTranscribeButton, accountPeer: accountPeer, topicAuthorId: topicAuthorId, hasBots: chatHasBots, translateToLanguage: translateToLanguage?.toLang, maxReadStoryId: maxReadStoryId, recommendedChannels: effectiveRecommendedChannels, audioTranscriptionTrial: audioTranscriptionTrial, chatThemes: chatThemes, deviceContactsNumbers: deviceContactsNumbers, isInline: !rotated, showSensitiveContent: contentSettings.ignoreContentRestrictionReasons.contains("sensitive"), isSuspiciousPeer: isSuspiciousPeer, accountCountry: accountCountry, ayuGramData: ayuGramData)

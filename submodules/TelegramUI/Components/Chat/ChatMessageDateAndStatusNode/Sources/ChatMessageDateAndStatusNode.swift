@@ -183,6 +183,7 @@ public class ChatMessageDateAndStatusNode: ASDisplayNode {
         var context: AccountContext
         var presentationData: ChatPresentationData
         var edited: Bool
+        var replaceEditedWithIcon: Bool
         var impressionCount: Int?
         var dateText: String
         var type: ChatMessageDateAndStatusType
@@ -209,6 +210,7 @@ public class ChatMessageDateAndStatusNode: ASDisplayNode {
             context: AccountContext,
             presentationData: ChatPresentationData,
             edited: Bool,
+            replaceEditedWithIcon: Bool = false,
             impressionCount: Int?,
             dateText: String,
             type: ChatMessageDateAndStatusType,
@@ -234,6 +236,7 @@ public class ChatMessageDateAndStatusNode: ASDisplayNode {
             self.context = context
             self.presentationData = presentationData
             self.edited = edited
+            self.replaceEditedWithIcon = replaceEditedWithIcon
             self.impressionCount = impressionCount == 0 ? nil : impressionCount
             self.dateText = dateText
             self.type = type
@@ -265,6 +268,7 @@ public class ChatMessageDateAndStatusNode: ASDisplayNode {
     private var clockFrameNode: ASImageNode?
     private var clockMinNode: ASImageNode?
     private let dateNode: TextNode
+    private var editedIcon: ASImageNode?
     private var impressionIcon: ASImageNode?
     private var reactionNodes: [MessageReaction.Reaction: StatusReactionNode] = [:]
     private let reactionButtonsContainer = ReactionButtonsAsyncLayoutContainer()
@@ -326,6 +330,7 @@ public class ChatMessageDateAndStatusNode: ASDisplayNode {
         var clockMinNode = self.clockMinNode
         
         var currentBackgroundNode = self.backgroundNode
+        var currentEditedIcon = self.editedIcon
         var currentImpressionIcon = self.impressionIcon
         var currentRepliesIcon = self.repliesIcon
         var currentStarsIcon = self.starsIcon
@@ -349,6 +354,7 @@ public class ChatMessageDateAndStatusNode: ASDisplayNode {
             let loadedCheckPartialImage: UIImage?
             let clockFrameImage: UIImage?
             let clockMinImage: UIImage?
+            var editedImage: UIImage?
             var impressionImage: UIImage?
             var repliesImage: UIImage?
             var starsImage: UIImage?
@@ -539,7 +545,9 @@ public class ChatMessageDateAndStatusNode: ASDisplayNode {
             }
             
             var updatedDateText = arguments.dateText
-            if arguments.edited {
+            if arguments.edited && arguments.replaceEditedWithIcon {
+                editedImage = generateTintedImage(image: UIImage(bundleImageName: "Chat/Message/MenuEditIcon"), color: dateColor)
+            } else if arguments.edited {
                 updatedDateText = "\(arguments.presentationData.strings.Conversation_MessageEditedLabel) \(updatedDateText)"
             }
             if let impressionCount = arguments.impressionCount {
@@ -560,6 +568,23 @@ public class ChatMessageDateAndStatusNode: ASDisplayNode {
             
             var impressionSize = CGSize()
             var impressionWidth: CGFloat = 0.0
+            var editedIconSize = CGSize()
+            var editedIconWidth: CGFloat = 0.0
+            if editedImage != nil {
+                if currentEditedIcon == nil {
+                    let iconNode = ASImageNode()
+                    iconNode.isLayerBacked = true
+                    iconNode.displayWithoutProcessing = true
+                    iconNode.displaysAsynchronously = false
+                    iconNode.contentMode = .scaleAspectFit
+                    currentEditedIcon = iconNode
+                }
+                editedIconSize = CGSize(width: 10.0, height: 10.0)
+                editedIconWidth = editedIconSize.width + 3.0
+            } else {
+                currentEditedIcon = nil
+            }
+
             if let impressionImage = impressionImage {
                 if currentImpressionIcon == nil {
                     let iconNode = ASImageNode()
@@ -573,6 +598,7 @@ public class ChatMessageDateAndStatusNode: ASDisplayNode {
             } else {
                 currentImpressionIcon = nil
             }
+            let prefixIconWidth = impressionWidth + editedIconWidth
             
             var repliesIconSize = CGSize()
             if let repliesImage = repliesImage {
@@ -636,7 +662,7 @@ public class ChatMessageDateAndStatusNode: ASDisplayNode {
                         clockMinNode?.displayWithoutProcessing = true
                         clockMinNode?.frame = CGRect(origin: CGPoint(), size: clockMinImage?.size ?? CGSize())
                     }
-                    clockPosition = CGPoint(x: leftInset + date.size.width + 8.5, y: 7.5 + offset)
+                    clockPosition = CGPoint(x: leftInset + prefixIconWidth + date.size.width + 8.5, y: 7.5 + offset)
                 case let .Sent(read):
                     let hideStatus: Bool
                     switch arguments.type {
@@ -676,9 +702,9 @@ public class ChatMessageDateAndStatusNode: ASDisplayNode {
                         let checkSize = loadedCheckFullImage!.size
                         
                         if read {
-                            checkReadFrame = CGRect(origin: CGPoint(x: leftInset + impressionWidth + date.size.width + 5.0 + statusWidth - checkSize.width, y: 3.0 + offset), size: checkSize)
+                            checkReadFrame = CGRect(origin: CGPoint(x: leftInset + prefixIconWidth + date.size.width + 5.0 + statusWidth - checkSize.width, y: 3.0 + offset), size: checkSize)
                         }
-                        checkSentFrame = CGRect(origin: CGPoint(x: leftInset + impressionWidth + date.size.width + 5.0 + statusWidth - checkSize.width - checkOffset, y: 3.0 + offset), size: checkSize)
+                        checkSentFrame = CGRect(origin: CGPoint(x: leftInset + prefixIconWidth + date.size.width + 5.0 + statusWidth - checkSize.width - checkOffset, y: 3.0 + offset), size: checkSize)
                     }
                 case .Failed:
                     statusWidth = 0.0
@@ -767,7 +793,7 @@ public class ChatMessageDateAndStatusNode: ASDisplayNode {
             
             leftInset += reactionInset
             
-            let layoutSize = CGSize(width: leftInset + impressionWidth + date.size.width + statusWidth + backgroundInsets.left + backgroundInsets.right, height: date.size.height + backgroundInsets.top + backgroundInsets.bottom)
+            let layoutSize = CGSize(width: leftInset + prefixIconWidth + date.size.width + statusWidth + backgroundInsets.left + backgroundInsets.right, height: date.size.height + backgroundInsets.top + backgroundInsets.bottom)
             
             let verticalReactionsInset: CGFloat
             let verticalInset: CGFloat
@@ -1110,7 +1136,25 @@ public class ChatMessageDateAndStatusNode: ASDisplayNode {
                             strongSelf.impressionIcon = nil
                         }
                         
-                        animation.animator.updateFrame(layer: strongSelf.dateNode.layer, frame: CGRect(origin: CGPoint(x: leftOffset + leftInset + backgroundInsets.left + impressionWidth, y: backgroundInsets.top + 1.0 + offset + verticalInset), size: date.size), completion: nil)
+                        if let currentEditedIcon = currentEditedIcon {
+                            let editedIconFrame = CGRect(origin: CGPoint(x: leftOffset + leftInset + backgroundInsets.left + impressionWidth, y: backgroundInsets.top + 1.0 + offset + verticalInset + floor((date.size.height - editedIconSize.height) / 2.0)), size: editedIconSize)
+                            currentEditedIcon.displaysAsynchronously = false
+                            if currentEditedIcon.image !== editedImage {
+                                currentEditedIcon.image = editedImage
+                            }
+                            if currentEditedIcon.supernode == nil {
+                                strongSelf.editedIcon = currentEditedIcon
+                                strongSelf.addSubnode(currentEditedIcon)
+                                currentEditedIcon.frame = editedIconFrame
+                            } else {
+                                animation.animator.updateFrame(layer: currentEditedIcon.layer, frame: editedIconFrame, completion: nil)
+                            }
+                        } else if let editedIcon = strongSelf.editedIcon {
+                            editedIcon.removeFromSupernode()
+                            strongSelf.editedIcon = nil
+                        }
+
+                        animation.animator.updateFrame(layer: strongSelf.dateNode.layer, frame: CGRect(origin: CGPoint(x: leftOffset + leftInset + backgroundInsets.left + prefixIconWidth, y: backgroundInsets.top + 1.0 + offset + verticalInset), size: date.size), completion: nil)
                         
                         if let clockFrameNode = clockFrameNode {
                             let clockPosition = CGPoint(x: leftOffset + backgroundInsets.left + clockPosition.x + reactionInset, y: backgroundInsets.top + clockPosition.y + verticalInset)

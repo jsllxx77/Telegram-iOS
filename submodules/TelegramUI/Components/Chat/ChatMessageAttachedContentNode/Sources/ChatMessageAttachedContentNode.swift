@@ -748,6 +748,7 @@ public final class ChatMessageAttachedContentNode: ASDisplayNode {
                                 context: context,
                                 presentationData: presentationData,
                                 edited: edited && !isPreview,
+                                replaceEditedWithIcon: associatedData.ayuGramData.replaceBottomInfoWithIcons,
                                 impressionCount: !isPreview ? viewCount : nil,
                                 dateText: dateText,
                                 type: statusType,

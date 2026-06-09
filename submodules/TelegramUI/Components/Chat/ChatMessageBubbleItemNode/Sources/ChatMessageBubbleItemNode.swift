@@ -2559,6 +2559,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
                     context: item.context,
                     presentationData: item.presentationData,
                     edited: edited && !item.presentationData.isPreview,
+                    replaceEditedWithIcon: item.associatedData.ayuGramData.replaceBottomInfoWithIcons,
                     impressionCount: !item.presentationData.isPreview ? viewCount : nil,
                     dateText: dateText,
                     type: statusType,

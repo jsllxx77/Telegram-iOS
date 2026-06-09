@@ -276,6 +276,7 @@ public class ChatMessageMapBubbleContentNode: ChatMessageBubbleContentNode {
                         context: item.context,
                         presentationData: item.presentationData,
                         edited: edited,
+                        replaceEditedWithIcon: item.associatedData.ayuGramData.replaceBottomInfoWithIcons,
                         impressionCount: !item.presentationData.isPreview ? viewCount : nil,
                         dateText: dateText,
                         type: statusType,

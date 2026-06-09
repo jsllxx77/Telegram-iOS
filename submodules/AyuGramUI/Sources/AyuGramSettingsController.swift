@@ -49,7 +49,11 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
 
     case appearanceHeader
     case semiTransparentDeletedMessages(Bool)
+    case messageBubbleRadius(Int32)
+    case avatarCorners(Int32)
+    case singleCornerRadius(Bool)
     case removeMessageTail(Bool)
+    case replaceBottomInfoWithIcons(Bool)
 
     case chatControlsHeader
     case hideFastShare(Bool)
@@ -72,7 +76,7 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return AyuGramSettingsSection.messageHistory.rawValue
         case .filtersHeader, .filtersEnabled, .filtersEnabledInChats, .filtersList:
             return AyuGramSettingsSection.filters.rawValue
-        case .appearanceHeader, .semiTransparentDeletedMessages, .removeMessageTail:
+        case .appearanceHeader, .semiTransparentDeletedMessages, .messageBubbleRadius, .avatarCorners, .singleCornerRadius, .removeMessageTail, .replaceBottomInfoWithIcons:
             return AyuGramSettingsSection.appearance.rawValue
         case .chatControlsHeader, .hideFastShare, .showPeerId, .showMessageSeconds, .hideSimilarChannels, .disableOpenLinkWarning:
             return AyuGramSettingsSection.chatControls.rawValue
@@ -111,6 +115,14 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return 301
         case .removeMessageTail:
             return 302
+        case .messageBubbleRadius:
+            return 303
+        case .avatarCorners:
+            return 304
+        case .singleCornerRadius:
+            return 305
+        case .replaceBottomInfoWithIcons:
+            return 306
         case .chatControlsHeader:
             return 400
         case .hideFastShare:
@@ -176,8 +188,28 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return ItemListSectionHeaderItem(presentationData: presentationData, text: "APPEARANCE", sectionId: self.section)
         case let .semiTransparentDeletedMessages(value):
             return ayuGramSwitchItem(presentationData: presentationData, title: "Semi-Transparent Deleted Messages", value: value, section: self.section, arguments: arguments, keyPath: \.semiTransparentDeletedMessages)
+        case let .messageBubbleRadius(value):
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "Message Bubble Radius", label: "\(value)", sectionId: self.section, style: .blocks, disclosureStyle: .none, action: {
+                arguments.updateSettings { settings in
+                    var settings = settings
+                    settings.messageBubbleRadius = nextValue(settings.messageBubbleRadius, values: [0, 4, 8, 12, 15, 16, 20, 24])
+                    return settings
+                }
+            })
+        case let .avatarCorners(value):
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "Avatar Corners", label: "\(value)", sectionId: self.section, style: .blocks, disclosureStyle: .none, action: {
+                arguments.updateSettings { settings in
+                    var settings = settings
+                    settings.avatarCorners = nextValue(settings.avatarCorners, values: [0, 6, 12, 18, 23])
+                    return settings
+                }
+            })
+        case let .singleCornerRadius(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "Single Bubble Corner Radius", value: value, section: self.section, arguments: arguments, keyPath: \.singleCornerRadius)
         case let .removeMessageTail(value):
             return ayuGramSwitchItem(presentationData: presentationData, title: "Remove Message Tail", value: value, section: self.section, arguments: arguments, keyPath: \.removeMessageTail)
+        case let .replaceBottomInfoWithIcons(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "Bottom Info Icons", value: value, section: self.section, arguments: arguments, keyPath: \.replaceBottomInfoWithIcons)
 
         case .chatControlsHeader:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: "CHAT CONTROLS", sectionId: self.section)
@@ -248,7 +280,11 @@ private func ayuGramSettingsControllerEntries(settings: AyuGramSettings) -> [Ayu
 
     entries.append(.appearanceHeader)
     entries.append(.semiTransparentDeletedMessages(settings.semiTransparentDeletedMessages))
+    entries.append(.messageBubbleRadius(settings.messageBubbleRadius))
+    entries.append(.avatarCorners(settings.avatarCorners))
+    entries.append(.singleCornerRadius(settings.singleCornerRadius))
     entries.append(.removeMessageTail(settings.removeMessageTail))
+    entries.append(.replaceBottomInfoWithIcons(settings.replaceBottomInfoWithIcons))
 
     entries.append(.chatControlsHeader)
     entries.append(.hideFastShare(settings.hideFastShare))
@@ -286,6 +322,16 @@ private func nextPeerIdDisplay(_ value: AyuPeerIdDisplay) -> AyuPeerIdDisplay {
     case .botApi:
         return .hidden
     }
+}
+
+private func nextValue(_ value: Int32, values: [Int32]) -> Int32 {
+    guard !values.isEmpty else {
+        return value
+    }
+    if let index = values.firstIndex(of: value) {
+        return values[(index + 1) % values.count]
+    }
+    return values[0]
 }
 
 private func stringForTranslationProvider(_ value: AyuTranslationProvider) -> String {

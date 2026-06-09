@@ -896,8 +896,9 @@ public final class ChatMessageAvatarHeader: ListViewItemHeader {
     public let context: AccountContext
     public let controllerInteraction: ChatControllerInteraction?
     public let storyStats: PeerStoryStats?
+    public let avatarCorners: Int32
 
-    public init(timestamp: Int32, peerId: PeerId, peer: Peer?, messageReference: MessageReference?, message: Message, presentationData: ChatPresentationData, context: AccountContext, controllerInteraction: ChatControllerInteraction?, storyStats: PeerStoryStats?) {
+    public init(timestamp: Int32, peerId: PeerId, peer: Peer?, messageReference: MessageReference?, message: Message, presentationData: ChatPresentationData, context: AccountContext, controllerInteraction: ChatControllerInteraction?, storyStats: PeerStoryStats?, avatarCorners: Int32 = 23) {
         self.peerId = peerId
         self.peer = peer
         self.messageReference = messageReference
@@ -918,6 +919,7 @@ public final class ChatMessageAvatarHeader: ListViewItemHeader {
         self.controllerInteraction = controllerInteraction
         self.id = ListViewItemNode.HeaderId(space: 1, id: Id(peerId: peerId, timestampId: dateHeaderTimestampId(timestamp: timestamp)))
         self.storyStats = storyStats
+        self.avatarCorners = avatarCorners
         
         let isRotated = controllerInteraction?.chatIsRotated ?? true
         
@@ -941,7 +943,7 @@ public final class ChatMessageAvatarHeader: ListViewItemHeader {
     }
 
     public func node(synchronousLoad: Bool) -> ListViewItemHeaderNode {
-        return ChatMessageAvatarHeaderNodeImpl(peerId: self.peerId, peer: self.peer, messageReference: self.messageReference, adMessageId: self.adMessageId, presentationData: self.presentationData, context: self.context, controllerInteraction: self.controllerInteraction, storyStats: self.storyStats, synchronousLoad: synchronousLoad)
+        return ChatMessageAvatarHeaderNodeImpl(peerId: self.peerId, peer: self.peer, messageReference: self.messageReference, adMessageId: self.adMessageId, presentationData: self.presentationData, context: self.context, controllerInteraction: self.controllerInteraction, storyStats: self.storyStats, avatarCorners: self.avatarCorners, synchronousLoad: synchronousLoad)
     }
 
     public func updateNode(_ node: ListViewItemHeaderNode, previous: ListViewItemHeader?, next: ListViewItemHeader?) {
@@ -949,6 +951,7 @@ public final class ChatMessageAvatarHeader: ListViewItemHeader {
             return
         }
         node.updatePresentationData(self.presentationData, context: self.context)
+        node.updateAvatarCorners(self.avatarCorners)
         if let peer = self.peer {
             node.updatePeer(peer: peer)
         }
@@ -970,6 +973,7 @@ public final class ChatMessageAvatarHeaderNodeImpl: ListViewItemHeaderNode, Chat
     private let messageReference: MessageReference?
     private var peer: Peer?
     private let adMessageId: EngineMessage.Id?
+    private var avatarCorners: Int32
 
     private let containerNode: ContextControllerSourceNode
     public let avatarNode: AvatarNode
@@ -995,7 +999,7 @@ public final class ChatMessageAvatarHeaderNodeImpl: ListViewItemHeaderNode, Chat
         }
     }
     
-    public init(peerId: PeerId, peer: Peer?, messageReference: MessageReference?, adMessageId: EngineMessage.Id?, presentationData: ChatPresentationData, context: AccountContext, controllerInteraction: ChatControllerInteraction?, storyStats: PeerStoryStats?, synchronousLoad: Bool) {
+    public init(peerId: PeerId, peer: Peer?, messageReference: MessageReference?, adMessageId: EngineMessage.Id?, presentationData: ChatPresentationData, context: AccountContext, controllerInteraction: ChatControllerInteraction?, storyStats: PeerStoryStats?, avatarCorners: Int32, synchronousLoad: Bool) {
         self.peerId = peerId
         self.peer = peer
         self.messageReference = messageReference
@@ -1004,6 +1008,7 @@ public final class ChatMessageAvatarHeaderNodeImpl: ListViewItemHeaderNode, Chat
         self.context = context
         self.controllerInteraction = controllerInteraction
         self.storyStats = storyStats
+        self.avatarCorners = avatarCorners
 
         self.containerNode = ContextControllerSourceNode()
 
@@ -1057,10 +1062,11 @@ public final class ChatMessageAvatarHeaderNodeImpl: ListViewItemHeaderNode, Chat
         if let previousPeer = self.peer, previousPeer.nameColor != peer.nameColor || previousPeer.smallProfileImage != peer.smallProfileImage || previousPeer.displayLetters != peer.displayLetters {
             self.peer = peer
             if peer.smallProfileImage != nil {
-                self.avatarNode.setPeerV2(context: self.context, theme: self.presentationData.theme.theme, peer: EnginePeer(peer), authorOfMessage: self.messageReference, overrideImage: nil, emptyColor: .black, synchronousLoad: false, displayDimensions: CGSize(width: avatarHeaderSize(), height: avatarHeaderSize()))
+                self.avatarNode.setPeerV2(context: self.context, theme: self.presentationData.theme.theme, peer: EnginePeer(peer), authorOfMessage: self.messageReference, overrideImage: nil, emptyColor: .black, clipStyle: self.avatarClipStyle(), synchronousLoad: false, displayDimensions: CGSize(width: avatarHeaderSize(), height: avatarHeaderSize()))
             } else {
-                self.avatarNode.setPeer(context: self.context, theme: self.presentationData.theme.theme, peer: EnginePeer(peer), authorOfMessage: self.messageReference, overrideImage: nil, emptyColor: .black, synchronousLoad: false, displayDimensions: CGSize(width: avatarHeaderSize(), height: avatarHeaderSize()))
+                self.avatarNode.setPeer(context: self.context, theme: self.presentationData.theme.theme, peer: EnginePeer(peer), authorOfMessage: self.messageReference, overrideImage: nil, emptyColor: .black, clipStyle: self.avatarClipStyle(), synchronousLoad: false, displayDimensions: CGSize(width: avatarHeaderSize(), height: avatarHeaderSize()))
             }
+            self.applyAvatarCorners()
         }
     }
 
@@ -1076,10 +1082,11 @@ public final class ChatMessageAvatarHeaderNodeImpl: ListViewItemHeaderNode, Chat
             overrideImage = .deletedIcon
         }
         if peer.smallProfileImage != nil {
-            self.avatarNode.setPeerV2(context: context, theme: theme, peer: EnginePeer(peer), authorOfMessage: authorOfMessage, overrideImage: overrideImage, emptyColor: emptyColor, synchronousLoad: synchronousLoad, displayDimensions: CGSize(width: avatarHeaderSize(), height: avatarHeaderSize()))
+            self.avatarNode.setPeerV2(context: context, theme: theme, peer: EnginePeer(peer), authorOfMessage: authorOfMessage, overrideImage: overrideImage, emptyColor: emptyColor, clipStyle: self.avatarClipStyle(), synchronousLoad: synchronousLoad, displayDimensions: CGSize(width: avatarHeaderSize(), height: avatarHeaderSize()))
         } else {
-            self.avatarNode.setPeer(context: context, theme: theme, peer: EnginePeer(peer), authorOfMessage: authorOfMessage, overrideImage: overrideImage, emptyColor: emptyColor, synchronousLoad: synchronousLoad, displayDimensions: CGSize(width: avatarHeaderSize(), height: avatarHeaderSize()))
+            self.avatarNode.setPeer(context: context, theme: theme, peer: EnginePeer(peer), authorOfMessage: authorOfMessage, overrideImage: overrideImage, emptyColor: emptyColor, clipStyle: self.avatarClipStyle(), synchronousLoad: synchronousLoad, displayDimensions: CGSize(width: avatarHeaderSize(), height: avatarHeaderSize()))
         }
+        self.applyAvatarCorners()
         
         if peer.isPremium && context.sharedContext.energyUsageSettings.autoplayVideo {
             self.cachedDataDisposable.set((context.account.postbox.peerView(id: peer.id)
@@ -1227,12 +1234,39 @@ public final class ChatMessageAvatarHeaderNodeImpl: ListViewItemHeaderNode, Chat
         }
     }
 
+    private func avatarCornerRadius() -> CGFloat {
+        return min(avatarHeaderSize() * 0.5, CGFloat(max(0, self.avatarCorners)))
+    }
+
+    private func avatarClipStyle() -> AvatarNodeClipStyle {
+        return self.avatarCornerRadius() >= avatarHeaderSize() * 0.5 ? .round : .none
+    }
+
+    private func applyAvatarCorners() {
+        let cornerRadius = self.avatarCornerRadius()
+        self.avatarNode.contentNode.imageNode.clipsToBounds = true
+        self.avatarNode.contentNode.imageNode.cornerRadius = cornerRadius
+        self.avatarVideoNode?.updateLayout(size: self.avatarNode.bounds.size, cornerRadius: cornerRadius, transition: .immediate)
+    }
+
+    public func updateAvatarCorners(_ avatarCorners: Int32) {
+        if self.avatarCorners != avatarCorners {
+            self.avatarCorners = avatarCorners
+            if let peer = self.peer {
+                self.setPeer(context: self.context, theme: self.presentationData.theme.theme, synchronousLoad: false, peer: peer, authorOfMessage: self.messageReference, emptyColor: .black)
+            } else {
+                self.applyAvatarCorners()
+            }
+        }
+    }
+
     override public func updateLayout(size: CGSize, leftInset: CGFloat, rightInset: CGFloat, transition: ContainedViewLayoutTransition) {
         transition.updateFrame(node: self.containerNode, frame: CGRect(origin: CGPoint(x: leftInset + 7.0, y: -3.0), size: CGSize(width: avatarHeaderSize(), height: avatarHeaderSize())))
         let avatarFrame = CGRect(origin: CGPoint(), size: CGSize(width: avatarHeaderSize(), height: avatarHeaderSize()))
         self.avatarNode.position = avatarFrame.center
         self.avatarNode.bounds = CGRect(origin: CGPoint(), size: avatarFrame.size)
         self.avatarNode.updateSize(size: avatarFrame.size)
+        self.applyAvatarCorners()
     }
 
     override public func animateRemoved(duration: Double) {
@@ -1317,7 +1351,7 @@ public final class ChatMessageAvatarHeaderNodeImpl: ListViewItemHeaderNode, Chat
         self.avatarVideoNode?.updateVisibility(isVisible)
       
         if let videoNode = self.avatarVideoNode {
-            videoNode.updateLayout(size: self.avatarNode.bounds.size, cornerRadius: self.avatarNode.bounds.size.width / 2.0, transition: .immediate)
+            videoNode.updateLayout(size: self.avatarNode.bounds.size, cornerRadius: self.avatarCornerRadius(), transition: .immediate)
             videoNode.frame = self.avatarNode.bounds
         }
     }

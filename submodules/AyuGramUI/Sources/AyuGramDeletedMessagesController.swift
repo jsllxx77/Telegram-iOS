@@ -116,7 +116,8 @@ private enum AyuGramDeletedMessagesControllerEntry: ItemListNodeEntry {
                 action: {}
             )
         case let .snapshot(index, snapshot):
-            let text = ayuGramHistorySnapshotText(snapshot, ordinal: index + 1, mode: .deleted)
+            let policy = AyuGramStreamerModePolicy(isEnabled: arguments.context.isAyuGramStreamerModeEnabled)
+            let text = ayuGramHistorySnapshotText(snapshot, ordinal: index + 1, mode: .deleted, policy: policy)
             return ItemListTextItem(
                 presentationData: presentationData,
                 text: .plain(text),

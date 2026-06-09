@@ -28,6 +28,7 @@ import AyuGramCore
 
 private struct AyuGramContextDisplaySettings: Equatable {
     var hidePremiumStatuses: Bool
+    var streamerModeEnabled: Bool
     var inputControls: AyuGramInputControls
     var drawerControls: AyuGramDrawerControls
     var webViewControls: AyuGramWebViewControls
@@ -181,6 +182,7 @@ public final class AccountContextImpl: AccountContext {
     private var ayuGramMessageHistoryPolicyDisposable: Disposable?
     private var ayuGramDisplaySettingsDisposable: Disposable?
     public private(set) var isAyuGramPremiumStatusHidden: Bool = false
+    public private(set) var isAyuGramStreamerModeEnabled: Bool = false
     public private(set) var ayuGramInputControls: AyuGramInputControls = .default
     public private(set) var ayuGramDrawerControls: AyuGramDrawerControls = .default
     public private(set) var ayuGramWebViewControls: AyuGramWebViewControls = .default
@@ -562,6 +564,7 @@ public final class AccountContextImpl: AccountContext {
             let settings = ayuGramSettings(sharedData: sharedData)
             return AyuGramContextDisplaySettings(
                 hidePremiumStatuses: settings.hidePremiumStatuses,
+                streamerModeEnabled: settings.streamerModeEnabled,
                 inputControls: AyuGramInputControls(
                     showAttachButtonInMessageField: settings.showAttachButtonInMessageField,
                     showCommandsButtonInMessageField: settings.showCommandsButtonInMessageField,
@@ -599,6 +602,7 @@ public final class AccountContextImpl: AccountContext {
         |> distinctUntilChanged
         |> deliverOnMainQueue).start(next: { [weak self] value in
             self?.isAyuGramPremiumStatusHidden = value.hidePremiumStatuses
+            self?.isAyuGramStreamerModeEnabled = value.streamerModeEnabled
             self?.ayuGramInputControls = value.inputControls
             self?.ayuGramDrawerControls = value.drawerControls
             self?.ayuGramWebViewControls = value.webViewControls

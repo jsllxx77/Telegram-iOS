@@ -113,6 +113,7 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
     case increaseWebviewWidth(Bool)
 
     case advancedHeader
+    case streamerModeEnabled(Bool)
     case crashReporting(Bool)
 
     var section: ItemListSectionId {
@@ -135,7 +136,7 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return AyuGramSettingsSection.translation.rawValue
         case .webViewHeader, .spoofWebviewAsAndroid, .increaseWebviewHeight, .increaseWebviewWidth:
             return AyuGramSettingsSection.webView.rawValue
-        case .advancedHeader, .crashReporting:
+        case .advancedHeader, .streamerModeEnabled, .crashReporting:
             return AyuGramSettingsSection.advanced.rawValue
         }
     }
@@ -264,8 +265,10 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return 523
         case .advancedHeader:
             return 600
-        case .crashReporting:
+        case .streamerModeEnabled:
             return 601
+        case .crashReporting:
+            return 602
         }
     }
 
@@ -435,6 +438,8 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
 
         case .advancedHeader:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: "ADVANCED", sectionId: self.section)
+        case let .streamerModeEnabled(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "Streamer Mode", value: value, section: self.section, arguments: arguments, keyPath: \.streamerModeEnabled)
         case let .crashReporting(value):
             return ayuGramSwitchItem(presentationData: presentationData, title: "Crash Reporting", value: value, section: self.section, arguments: arguments, keyPath: \.crashReporting)
         }
@@ -533,6 +538,7 @@ private func ayuGramSettingsControllerEntries(settings: AyuGramSettings) -> [Ayu
     entries.append(.increaseWebviewWidth(settings.increaseWebviewWidth))
 
     entries.append(.advancedHeader)
+    entries.append(.streamerModeEnabled(settings.streamerModeEnabled))
     entries.append(.crashReporting(settings.crashReporting))
 
     return entries

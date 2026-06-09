@@ -1,6 +1,7 @@
 import Foundation
 import UIKit
 import AccountContext
+import AyuGramCore
 import Display
 import ItemListUI
 import Postbox
@@ -116,7 +117,8 @@ private func ayuGramMessageDetailsControllerEntries(
 }
 
 public func ayuGramMessageDetailsController(context: AccountContext, message: Message) -> ViewController {
-    let details = ayuGramMessageDetailsData(message: message)
+    let policy = AyuGramStreamerModePolicy(isEnabled: context.isAyuGramStreamerModeEnabled)
+    let details = ayuGramMessageDetailsData(message: message, policy: policy)
     let arguments = AyuGramMessageDetailsControllerArguments(copyValue: { value in
         UIPasteboard.general.string = value
     })
@@ -144,7 +146,7 @@ public func ayuGramMessageDetailsController(context: AccountContext, message: Me
     return ItemListController(context: context, state: signal)
 }
 
-private func ayuGramMessageDetailsData(message: Message) -> AyuGramMessageDetailsData {
+private func ayuGramMessageDetailsData(message: Message, policy: AyuGramStreamerModePolicy) -> AyuGramMessageDetailsData {
     let peerId = message.id.peerId.toInt64()
     let messageId = "\(message.id.namespace):\(message.id.id)"
     let authorId = message.author?.id.toInt64()
@@ -153,45 +155,56 @@ private func ayuGramMessageDetailsData(message: Message) -> AyuGramMessageDetail
     let views = ayuGramMessageDetailsViewCount(message)
     let forwards = ayuGramMessageDetailsForwardCount(message)
     let mediaSummary = ayuGramMessageDetailsMediaSummary(message)
+    let hiddenValue = AyuGramStreamerRedaction.hiddenValue
+
+    let displayPeerId = policy.isEnabled ? hiddenValue : "\(peerId)"
+    let displayMessageId = policy.isEnabled ? hiddenValue : messageId
+    let displayAuthorId = policy.isEnabled ? hiddenValue : ayuGramOptionalInt64String(authorId)
+    let displayThreadId = policy.isEnabled ? hiddenValue : ayuGramOptionalInt64String(message.threadId)
 
     var lines: [String] = []
-    lines.append("Peer ID: \(peerId)")
-    lines.append("Message ID: \(messageId)")
-    lines.append("Author ID: \(ayuGramOptionalInt64String(authorId))")
+    lines.append("Peer ID: \(displayPeerId)")
+    lines.append("Message ID: \(displayMessageId)")
+    lines.append("Author ID: \(displayAuthorId)")
     lines.append("Date: \(ayuGramHistoryDateString(message.timestamp))")
     lines.append("Edit Date: \(editDate.map(ayuGramHistoryDateString) ?? "Unknown")")
     lines.append("Views: \(views.map { "\($0)" } ?? "Unknown")")
     lines.append("Forwards: \(forwards.map { "\($0)" } ?? "Unknown")")
     lines.append("Entity Count: \(entityCount)")
     lines.append("Media: \(mediaSummary)")
-    lines.append("Thread ID: \(ayuGramOptionalInt64String(message.threadId))")
+    lines.append("Thread ID: \(displayThreadId)")
 
     if let globallyUniqueId = message.globallyUniqueId {
-        lines.append("Global Unique ID: \(globallyUniqueId)")
+        let displayGloballyUniqueId = policy.isEnabled ? hiddenValue : "\(globallyUniqueId)"
+        lines.append("Global Unique ID: \(displayGloballyUniqueId)")
     }
-    lines.append("Stable ID: \(message.stableId)")
+    let displayStableId = policy.isEnabled ? hiddenValue : "\(message.stableId)"
+    lines.append("Stable ID: \(displayStableId)")
     if let groupingKey = message.groupingKey {
-        lines.append("Grouping Key: \(groupingKey)")
+        let displayGroupingKey = policy.isEnabled ? hiddenValue : "\(groupingKey)"
+        lines.append("Grouping Key: \(displayGroupingKey)")
     }
     if let sourceMessageId = message.forwardInfo?.sourceMessageId {
-        lines.append("Forward Source Message ID: \(sourceMessageId.namespace):\(sourceMessageId.id)")
-        lines.append("Forward Source Peer ID: \(sourceMessageId.peerId.toInt64())")
+        let displaySourceMessageId = policy.isEnabled ? hiddenValue : "\(sourceMessageId.namespace):\(sourceMessageId.id)"
+        let displaySourcePeerId = policy.isEnabled ? hiddenValue : "\(sourceMessageId.peerId.toInt64())"
+        lines.append("Forward Source Message ID: \(displaySourceMessageId)")
+        lines.append("Forward Source Peer ID: \(displaySourcePeerId)")
     }
     if let forwardDate = message.forwardInfo?.date {
         lines.append("Forward Date: \(ayuGramHistoryDateString(forwardDate))")
     }
 
     var copyActions: [(String, String)] = []
-    copyActions.append(("Copy Peer ID", "\(peerId)"))
-    copyActions.append(("Copy Message ID", messageId))
+    copyActions.append(("Copy Peer ID", displayPeerId))
+    copyActions.append(("Copy Message ID", displayMessageId))
     if let authorId = authorId {
-        copyActions.append(("Copy Author ID", "\(authorId)"))
+        copyActions.append(("Copy Author ID", policy.isEnabled ? hiddenValue : "\(authorId)"))
     }
     if let threadId = message.threadId {
-        copyActions.append(("Copy Thread ID", "\(threadId)"))
+        copyActions.append(("Copy Thread ID", policy.isEnabled ? hiddenValue : "\(threadId)"))
     }
     if !message.text.isEmpty {
-        copyActions.append(("Copy Message Text", message.text))
+        copyActions.append(("Copy Message Text", AyuGramStreamerRedaction.messagePreview(message.text, policy: policy)))
     }
     copyActions.append(("Copy All Details", lines.joined(separator: "\n")))
 

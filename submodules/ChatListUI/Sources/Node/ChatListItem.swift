@@ -3,6 +3,7 @@ import UIKit
 import AsyncDisplayKit
 import Display
 import SwiftSignalKit
+import AyuGramCore
 import Postbox
 import TelegramCore
 import TelegramPresentationData
@@ -2462,6 +2463,19 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
             let currentAvatarBadgeCleanBackgroundImage: UIImage? = PresentationResourcesChatList.badgeBackgroundBorder(item.presentationData.theme, diameter: avatarBadgeDiameter + 4.0)
             
             let leftInset: CGFloat = params.leftInset + avatarLeftInset
+            let streamerPolicy = AyuGramStreamerModePolicy(isEnabled: item.context.isAyuGramStreamerModeEnabled)
+            func streamerRedactedAttributedString(_ attributedString: NSAttributedString, asPeerTitle: Bool) -> NSAttributedString {
+                guard streamerPolicy.isEnabled, attributedString.length != 0 else {
+                    return attributedString
+                }
+                let redactedString: String
+                if asPeerTitle {
+                    redactedString = AyuGramStreamerRedaction.peerTitle(attributedString.string, policy: streamerPolicy)
+                } else {
+                    redactedString = AyuGramStreamerRedaction.userTitle(attributedString.string, policy: streamerPolicy)
+                }
+                return NSAttributedString(string: redactedString, attributes: attributedString.attributes(at: 0, effectiveRange: nil))
+            }
             
             enum ContentData {
                 case chat(itemPeer: EngineRenderedPeer, threadInfo: ChatListItemContent.ThreadInfo?, peer: EnginePeer?, hideAuthor: Bool, messageText: String, messageEntities: [MessageTextEntity], spoilers: [NSRange]?, customEmojiRanges: [(NSRange, ChatTextInputTextCustomEmojiAttribute)]?)
@@ -2499,6 +2513,14 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                         }
                     default:
                         break
+                    }
+
+                    if streamerPolicy.isEnabled {
+                        initialHideAuthor = true
+                        messageText = AyuGramStreamerRedaction.messagePreview(messageText, policy: streamerPolicy)
+                        messageEntities = []
+                        spoilers = nil
+                        customEmojiRanges = nil
                     }
                     
                     contentData = .chat(itemPeer: itemPeer, threadInfo: threadInfo, peer: peer, hideAuthor: hideAuthor, messageText: messageText, messageEntities: messageEntities, spoilers: spoilers, customEmojiRanges: customEmojiRanges)
@@ -2543,6 +2565,9 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                     } else if messages.last?.id.peerId.namespace != Namespaces.Peer.CloudUser && messages.last?.id.peerId.namespace != Namespaces.Peer.SecretChat {
                         inlineAuthorPrefix = EnginePeer.user(author).compactDisplayTitle
                     }
+                }
+                if let inlineAuthorPrefixValue = inlineAuthorPrefix {
+                    inlineAuthorPrefix = AyuGramStreamerRedaction.userTitle(inlineAuthorPrefixValue, policy: streamerPolicy)
                 }
             }
             
@@ -2656,6 +2681,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                     if let forumTopicData, forumThread == nil, case let .user(user) = itemPeer.chatMainPeer, let botInfo = user.botInfo, botInfo.flags.contains(.hasForum) {
                         forumThread = (forumTopicData.id, forumTopicData.title, forumTopicData.iconFileId, forumTopicData.iconColor, forumTopicData.threadPeer, forumTopicData.isUnread)
                     }
+                    peerText = peerText.map { AyuGramStreamerRedaction.userTitle($0, policy: streamerPolicy) }
                     
                     let messageText: String
                     if let currentChatListText = currentChatListText, currentChatListText.0 == text {
@@ -3051,7 +3077,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                         }
                         
                         if let peerText = peerText {
-                            authorAttributedString = NSAttributedString(string: peerText, font: textFont, textColor: theme.authorNameColor)
+                            authorAttributedString = NSAttributedString(string: AyuGramStreamerRedaction.userTitle(peerText, policy: streamerPolicy), font: textFont, textColor: theme.authorNameColor)
                         }
                     }
                 case let .group(peers):
@@ -3059,7 +3085,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                     var isFirst = true
                     for peer in peers {
                         if let chatMainPeer = peer.peer.chatMainPeer {
-                            let peerTitle = chatMainPeer.compactDisplayTitle
+                            let peerTitle = AyuGramStreamerRedaction.peerTitle(chatMainPeer.compactDisplayTitle, policy: streamerPolicy)
                             if !peerTitle.isEmpty {
                                 if isFirst {
                                     isFirst = false
@@ -3141,6 +3167,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                 }
             }
             
+            var shouldRedactTitleAttributedString = false
             switch contentData {
                 case let .chat(itemPeer, threadInfo, _, _, _, _, _, _):
                     if case let .peer(peerData) = item.content, let customMessageListData = peerData.customMessageListData {
@@ -3155,6 +3182,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                                     textColor = theme.titleColor
                                 }
                                 titleAttributedString = NSAttributedString(string: displayTitle, font: titleFont, textColor: textColor)
+                                shouldRedactTitleAttributedString = true
                                 
                                 if case let .channel(channel) = itemPeer.peer, channel.flags.contains(.isMonoforum) {
                                     titleBadgeText = item.presentationData.strings.ChatList_MonoforumLabel
@@ -3163,8 +3191,10 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                         }
                     } else if let threadInfo = threadInfo {
                         titleAttributedString = NSAttributedString(string: threadInfo.info.title, font: titleFont, textColor: theme.titleColor)
+                        shouldRedactTitleAttributedString = true
                     } else if let message = messages.last, case let .user(author) = message.author, displayAsMessage {
                         titleAttributedString = NSAttributedString(string: author.id == account.peerId ? item.presentationData.strings.DialogList_You : EnginePeer.user(author).displayTitle(strings: item.presentationData.strings, displayOrder: item.presentationData.nameDisplayOrder), font: titleFont, textColor: theme.titleColor)
+                        shouldRedactTitleAttributedString = author.id != account.peerId
                     } else if isPeerGroup {
                         titleAttributedString = NSAttributedString(string: item.presentationData.strings.ChatList_ArchivedChatsTitle, font: titleFont, textColor: theme.titleColor)
                     } else if itemPeer.chatMainPeer?.id == item.context.account.peerId {
@@ -3188,9 +3218,13 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                             titleBadgeText = item.presentationData.strings.ChatList_MonoforumLabel
                         }
                         titleAttributedString = NSAttributedString(string: displayTitle, font: titleFont, textColor: textColor)
+                        shouldRedactTitleAttributedString = true
                     }
                 case .group:
                     titleAttributedString = NSAttributedString(string: item.presentationData.strings.ChatList_ArchivedChatsTitle, font: titleFont, textColor: theme.titleColor)
+            }
+            if shouldRedactTitleAttributedString {
+                titleAttributedString = titleAttributedString.map { streamerRedactedAttributedString($0, asPeerTitle: true) }
             }
             
             textAttributedString = attributedText
@@ -3562,11 +3596,11 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                 if forumThread != nil || !topForumTopicItems.isEmpty {
                     if let forumThread {
                         isFirstForumThreadSelectable = false
-                        forumThreads.append((id: forumThread.id, threadPeer: forumThread.threadPeer, title: NSAttributedString(string: forumThread.threadPeer?.compactDisplayTitle ?? " ", font: textFont, textColor: forumThread.isUnread || isSearching ? theme.authorNameColor : theme.messageTextColor), iconId: nil, iconColor: nil))
+                        forumThreads.append((id: forumThread.id, threadPeer: forumThread.threadPeer, title: streamerRedactedAttributedString(NSAttributedString(string: forumThread.threadPeer?.compactDisplayTitle ?? " ", font: textFont, textColor: forumThread.isUnread || isSearching ? theme.authorNameColor : theme.messageTextColor), asPeerTitle: true), iconId: nil, iconColor: nil))
                     }
                     for topicItem in topForumTopicItems {
                         if forumThread?.id != topicItem.id {
-                            forumThreads.append((id: topicItem.id, threadPeer: topicItem.threadPeer, title: NSAttributedString(string: topicItem.threadPeer?.compactDisplayTitle ?? " ", font: textFont, textColor: topicItem.isUnread || isSearching ? theme.authorNameColor : theme.messageTextColor), iconId: nil, iconColor: nil))
+                            forumThreads.append((id: topicItem.id, threadPeer: topicItem.threadPeer, title: streamerRedactedAttributedString(NSAttributedString(string: topicItem.threadPeer?.compactDisplayTitle ?? " ", font: textFont, textColor: topicItem.isUnread || isSearching ? theme.authorNameColor : theme.messageTextColor), asPeerTitle: true), iconId: nil, iconColor: nil))
                         }
                     }
                     
@@ -3588,13 +3622,13 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                         isFirstForumThreadSelectable = forumThread.isUnread
                     }
                     
-                    forumThreads.append((id: forumThread.id, threadPeer: forumThread.threadPeer, title: NSAttributedString(string: forumThread.title, font: textFont, textColor: forumThread.isUnread || isSearching ? theme.authorNameColor : theme.messageTextColor), iconId: forumThread.iconId, iconColor: forumThread.iconColor))
+                    forumThreads.append((id: forumThread.id, threadPeer: forumThread.threadPeer, title: streamerRedactedAttributedString(NSAttributedString(string: forumThread.title, font: textFont, textColor: forumThread.isUnread || isSearching ? theme.authorNameColor : theme.messageTextColor), asPeerTitle: true), iconId: forumThread.iconId, iconColor: forumThread.iconColor))
                 }
                 for topicItem in topForumTopicItems {
                     if case let .peer(peer) = item.content, peer.peer.peerId.id._internalGetInt64Value() == topicItem.id {
                         
                     } else if forumThread?.id != topicItem.id {
-                        forumThreads.append((id: topicItem.id, threadPeer: topicItem.threadPeer, title: NSAttributedString(string: topicItem.title, font: textFont, textColor: topicItem.isUnread || isSearching ? theme.authorNameColor : theme.messageTextColor), iconId: topicItem.iconFileId, iconColor: topicItem.iconColor))
+                        forumThreads.append((id: topicItem.id, threadPeer: topicItem.threadPeer, title: streamerRedactedAttributedString(NSAttributedString(string: topicItem.title, font: textFont, textColor: topicItem.isUnread || isSearching ? theme.authorNameColor : theme.messageTextColor), asPeerTitle: true), iconId: topicItem.iconFileId, iconColor: topicItem.iconColor))
                     }
                 }
                 

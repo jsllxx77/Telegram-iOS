@@ -203,6 +203,7 @@ public struct AyuGramSettings: Codable, Equatable {
     public var showStreamerToggleInDrawer: Bool
     public var showGhostToggleInTray: Bool
     public var showStreamerToggleInTray: Bool
+    public var streamerModeEnabled: Bool
     public var hidePremiumStatuses: Bool
     public var monoFont: String
     public var hideNotificationCounters: Bool
@@ -295,6 +296,7 @@ public struct AyuGramSettings: Codable, Equatable {
         showStreamerToggleInDrawer: Bool = false,
         showGhostToggleInTray: Bool = true,
         showStreamerToggleInTray: Bool = false,
+        streamerModeEnabled: Bool = false,
         hidePremiumStatuses: Bool = false,
         monoFont: String = "",
         hideNotificationCounters: Bool = false,
@@ -384,6 +386,7 @@ public struct AyuGramSettings: Codable, Equatable {
         self.showStreamerToggleInDrawer = showStreamerToggleInDrawer
         self.showGhostToggleInTray = showGhostToggleInTray
         self.showStreamerToggleInTray = showStreamerToggleInTray
+        self.streamerModeEnabled = streamerModeEnabled
         self.hidePremiumStatuses = hidePremiumStatuses
         self.monoFont = monoFont
         self.hideNotificationCounters = hideNotificationCounters
@@ -475,6 +478,7 @@ public struct AyuGramSettings: Codable, Equatable {
         case showStreamerToggleInDrawer
         case showGhostToggleInTray
         case showStreamerToggleInTray
+        case streamerModeEnabled
         case hidePremiumStatuses
         case monoFont
         case hideNotificationCounters
@@ -569,6 +573,7 @@ public struct AyuGramSettings: Codable, Equatable {
         self.showStreamerToggleInDrawer = container.decodeIfPresent(Bool.self, forKey: .showStreamerToggleInDrawer, fallback: defaults.showStreamerToggleInDrawer)
         self.showGhostToggleInTray = container.decodeIfPresent(Bool.self, forKey: .showGhostToggleInTray, fallback: defaults.showGhostToggleInTray)
         self.showStreamerToggleInTray = container.decodeIfPresent(Bool.self, forKey: .showStreamerToggleInTray, fallback: defaults.showStreamerToggleInTray)
+        self.streamerModeEnabled = container.decodeIfPresent(Bool.self, forKey: .streamerModeEnabled, fallback: defaults.streamerModeEnabled)
         self.hidePremiumStatuses = container.decodeIfPresent(Bool.self, forKey: .hidePremiumStatuses, fallback: defaults.hidePremiumStatuses)
         self.monoFont = container.decodeIfPresent(String.self, forKey: .monoFont, fallback: defaults.monoFont)
         self.hideNotificationCounters = container.decodeIfPresent(Bool.self, forKey: .hideNotificationCounters, fallback: defaults.hideNotificationCounters)
@@ -670,6 +675,7 @@ public struct AyuGramSettings: Codable, Equatable {
         try container.encode(self.showStreamerToggleInDrawer, forKey: .showStreamerToggleInDrawer)
         try container.encode(self.showGhostToggleInTray, forKey: .showGhostToggleInTray)
         try container.encode(self.showStreamerToggleInTray, forKey: .showStreamerToggleInTray)
+        try container.encode(self.streamerModeEnabled, forKey: .streamerModeEnabled)
         try container.encode(self.hidePremiumStatuses, forKey: .hidePremiumStatuses)
         try container.encode(self.monoFont, forKey: .monoFont)
         try container.encode(self.hideNotificationCounters, forKey: .hideNotificationCounters)

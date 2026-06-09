@@ -10,6 +10,11 @@ import TelegramCore
 import TelegramPresentationData
 
 private final class AyuGramEditedHistoryControllerArguments {
+    let policy: AyuGramStreamerModePolicy
+
+    init(policy: AyuGramStreamerModePolicy) {
+        self.policy = policy
+    }
 }
 
 private enum AyuGramEditedHistorySection: Int32 {
@@ -84,9 +89,11 @@ private enum AyuGramEditedHistoryControllerEntry: ItemListNodeEntry {
     }
 
     func item(presentationData: ItemListPresentationData, arguments: Any) -> ListViewItem {
+        let arguments = arguments as! AyuGramEditedHistoryControllerArguments
+
         switch self {
         case let .snapshot(index, snapshot):
-            let text = ayuGramHistorySnapshotText(snapshot, ordinal: index + 1, mode: .edited)
+            let text = ayuGramHistorySnapshotText(snapshot, ordinal: index + 1, mode: .edited, policy: arguments.policy)
             return ItemListTextItem(
                 presentationData: presentationData,
                 text: .plain(text),
@@ -116,7 +123,7 @@ private func ayuGramEditedHistoryControllerEntries(snapshots: [AyuGramMessageSna
 }
 
 public func ayuGramEditedHistoryController(context: AccountContext, messageId: MessageId) -> ViewController {
-    let arguments = AyuGramEditedHistoryControllerArguments()
+    let arguments = AyuGramEditedHistoryControllerArguments(policy: AyuGramStreamerModePolicy(isEnabled: context.isAyuGramStreamerModeEnabled))
     let storeKey = PreferencesKeys.ayuGramMessageHistoryStore()
     let accountPeerId = context.account.peerId.toInt64()
     let peerId = messageId.peerId.toInt64()
@@ -167,20 +174,23 @@ enum AyuGramHistorySnapshotMode {
     case deleted
 }
 
-func ayuGramHistorySnapshotText(_ snapshot: AyuGramMessageSnapshot, ordinal: Int, mode: AyuGramHistorySnapshotMode) -> String {
+func ayuGramHistorySnapshotText(_ snapshot: AyuGramMessageSnapshot, ordinal: Int, mode: AyuGramHistorySnapshotMode, policy: AyuGramStreamerModePolicy = .disabled) -> String {
     var lines: [String] = []
     lines.append("#\(ordinal)")
 
     if !snapshot.text.isEmpty {
-        lines.append(snapshot.text)
+        lines.append(AyuGramStreamerRedaction.messagePreview(snapshot.text, policy: policy))
     } else if let mediaSummary = snapshot.mediaSummary, !mediaSummary.isEmpty {
         lines.append("[\(mediaSummary)]")
     } else {
         lines.append("[No text]")
     }
 
-    lines.append("Author: \(ayuGramOptionalInt64String(snapshot.authorPeerId))")
-    lines.append("Message ID: \(snapshot.messageNamespace):\(snapshot.messageId)")
+    let hiddenValue = AyuGramStreamerRedaction.hiddenValue
+    let displayAuthorId = policy.isEnabled ? hiddenValue : ayuGramOptionalInt64String(snapshot.authorPeerId)
+    let displayMessageId = policy.isEnabled ? hiddenValue : "\(snapshot.messageNamespace):\(snapshot.messageId)"
+    lines.append("Author: \(displayAuthorId)")
+    lines.append("Message ID: \(displayMessageId)")
     lines.append("Date: \(ayuGramHistoryDateString(snapshot.timestamp))")
 
     switch mode {
@@ -200,10 +210,12 @@ func ayuGramHistorySnapshotText(_ snapshot: AyuGramMessageSnapshot, ordinal: Int
     }
 
     if let stableId = snapshot.stableId {
-        lines.append("Stable ID: \(stableId)")
+        let displayStableId = policy.isEnabled ? hiddenValue : "\(stableId)"
+        lines.append("Stable ID: \(displayStableId)")
     }
     if let threadId = snapshot.threadId {
-        lines.append("Thread ID: \(threadId)")
+        let displayThreadId = policy.isEnabled ? hiddenValue : "\(threadId)"
+        lines.append("Thread ID: \(displayThreadId)")
     }
     if let mediaSummary = snapshot.mediaSummary, !mediaSummary.isEmpty, !snapshot.text.isEmpty {
         lines.append("Media: \(mediaSummary)")

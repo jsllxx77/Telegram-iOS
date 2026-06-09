@@ -6,6 +6,7 @@ import AsyncDisplayKit
 import TelegramCore
 import TelegramPresentationData
 import TelegramUIPreferences
+import AyuGramCore
 import MediaResources
 import AccountContext
 import TemporaryCachedPeerDataManager
@@ -2485,13 +2486,23 @@ public final class ChatHistoryListNodeImpl: ListViewImpl, ChatHistoryNode, ChatH
     
     private func beginReadHistoryManagement() {
         let previousMaxIncomingMessageIndexByNamespace = Atomic<[MessageId.Namespace: MessageIndex]>(value: [:])
-        let readHistory = combineLatest(self.maxVisibleIncomingMessageIndex.get(), self.canReadHistory.get())
+        let accountId = self.context.account.peerId.id._internalGetInt64Value()
+        let ayuGramGhostPolicy = self.context.sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.ayuGramSettings])
+        |> map { sharedData -> AyuGramGhostPolicy in
+            let settings = ayuGramSettings(sharedData: sharedData)
+            let ghostSettings = settings.useGlobalGhostMode ? AyuGramGhostSettings.defaultSettings : (settings.ghostAccounts[accountId] ?? AyuGramGhostSettings.defaultSettings)
+            return AyuGramGhostPolicy(sendReadMessages: ghostSettings.sendReadMessages && !ghostSettings.sendReadMessagesLocked)
+        }
+        let readHistory = combineLatest(self.maxVisibleIncomingMessageIndex.get(), self.canReadHistory.get(), ayuGramGhostPolicy)
         
-        self.readHistoryDisposable.set((readHistory |> deliverOnMainQueue).startStrict(next: { [weak self] messageIndex, canRead in
+        self.readHistoryDisposable.set((readHistory |> deliverOnMainQueue).startStrict(next: { [weak self] messageIndex, canRead, ayuGramGhostPolicy in
             guard let strongSelf = self else {
                 return
             }
             if !canRead {
+                return
+            }
+            if !ayuGramGhostPolicy.shouldApplyAutomaticReadHistory {
                 return
             }
             

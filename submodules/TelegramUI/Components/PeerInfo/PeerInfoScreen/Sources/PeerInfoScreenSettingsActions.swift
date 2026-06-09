@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import AyuGramUI
 import Display
 import AccountContext
 import SwiftSignalKit
@@ -295,6 +296,8 @@ extension PeerInfoScreenNode {
             if let tonContext = self.controller?.tonContext {
                 push(self.context.sharedContext.makeStarsTransactionsScreen(context: self.context, starsContext: tonContext))
             }
+        case .ayuGram:
+            push(ayuGramSettingsController(context: self.context))
         }
     }
 

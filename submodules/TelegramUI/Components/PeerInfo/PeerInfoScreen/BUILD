@@ -14,6 +14,7 @@ swift_library(
         "//submodules/AccountUtils",
         "//submodules/ActionSheetPeerItem",
         "//submodules/ActivityIndicator",
+        "//submodules/AyuGramUI:AyuGramUI",
         "//submodules/TelegramUI/Components/AnimationCache",
         "//submodules/AnimationUI",
         "//submodules/AppBundle",

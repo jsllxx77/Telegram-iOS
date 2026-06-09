@@ -5,6 +5,7 @@ public enum AyuGramMessageContextMenuAction: Equatable {
     case viewEditedHistory
     case viewDeletedMessages
     case messageDetails
+    case messageShot
     case userMessages
     case repeatMessage
     case readUntil
@@ -40,6 +41,7 @@ public struct AyuGramMessageContextMenuInput {
     public let hasEditedHistory: Bool
     public let canViewDeletedMessages: Bool
     public let canViewMessageDetails: Bool
+    public let canCreateMessageShot: Bool
     public let canViewUserMessages: Bool
     public let canRepeatMessage: Bool
     public let canReadUntil: Bool
@@ -58,6 +60,7 @@ public struct AyuGramMessageContextMenuInput {
         hasEditedHistory: Bool,
         canViewDeletedMessages: Bool,
         canViewMessageDetails: Bool,
+        canCreateMessageShot: Bool,
         canViewUserMessages: Bool,
         canRepeatMessage: Bool,
         canReadUntil: Bool,
@@ -75,6 +78,7 @@ public struct AyuGramMessageContextMenuInput {
         self.hasEditedHistory = hasEditedHistory
         self.canViewDeletedMessages = canViewDeletedMessages
         self.canViewMessageDetails = canViewMessageDetails
+        self.canCreateMessageShot = canCreateMessageShot
         self.canViewUserMessages = canViewUserMessages
         self.canRepeatMessage = canRepeatMessage
         self.canReadUntil = canReadUntil
@@ -117,6 +121,14 @@ public func ayuGramMessageContextMenuDescriptors(
             action: .messageDetails,
             title: "Message Details",
             iconName: "Chat/Context Menu/Info"
+        ))
+    }
+
+    if input.canCreateMessageShot && settings.showMessageShot {
+        descriptors.append(AyuGramMessageContextMenuDescriptor(
+            action: .messageShot,
+            title: "Message Shot",
+            iconName: "Chat/Context Menu/Share"
         ))
     }
 

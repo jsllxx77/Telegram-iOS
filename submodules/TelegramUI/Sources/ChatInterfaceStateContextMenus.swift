@@ -1547,6 +1547,7 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
             hasEditedHistory: ayuGramHasEditedHistory,
             canViewDeletedMessages: true,
             canViewMessageDetails: message.id.namespace == Namespaces.Message.Cloud,
+            canCreateMessageShot: messages.count == 1 && !message.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
             canViewUserMessages: ayuGramCanViewUserMessages,
             canRepeatMessage: ayuGramCanRepeatMessage,
             canReadUntil: data.canReadUntil && readUntilMessage != nil,
@@ -1568,6 +1569,7 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
                     threadId: threadId,
                     messageText: messageText,
                     authorPeer: ayuGramAuthorPeer,
+                    ayuSettings: ayuSettings,
                     readUntilMessage: readUntilMessage,
                     controllerInteraction: controllerInteraction,
                     interfaceInteraction: interfaceInteraction
@@ -2424,6 +2426,7 @@ private func ayuGramContextMenuItem(
     threadId: Int64?,
     messageText: String,
     authorPeer: Peer?,
+    ayuSettings: AyuGramSettings,
     readUntilMessage: ((Message) -> Void)?,
     controllerInteraction: ChatControllerInteraction,
     interfaceInteraction: ChatPanelInterfaceInteraction
@@ -2443,6 +2446,14 @@ private func ayuGramContextMenuItem(
         case .messageDetails:
             f(.dismissWithoutContent)
             controllerInteraction.navigationController()?.pushViewController(ayuGramMessageDetailsController(context: context, message: message))
+        case .messageShot:
+            f(.dismissWithoutContent)
+            ayuGramPresentMessageShot(
+                context: context,
+                message: message,
+                settings: ayuSettings.messageShotSettings,
+                sourceView: controllerInteraction.navigationController()?.view
+            )
         case .userMessages:
             if let authorPeer = authorPeer {
                 interfaceInteraction.beginMessageSearch(.member(authorPeer), "")

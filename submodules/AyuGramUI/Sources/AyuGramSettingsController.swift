@@ -32,6 +32,7 @@ private final class AyuGramSettingsControllerArguments {
 private enum AyuGramSettingsSection: Int32 {
     case ghostMode
     case messageHistory
+    case messageShot
     case filters
     case appearance
     case chatControls
@@ -50,6 +51,16 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
     case messageHistoryHeader
     case saveDeletedMessages(Bool)
     case saveMessagesHistory(Bool)
+
+    case messageShotHeader
+    case showMessageShot(Bool)
+    case messageShotShowBackground(Bool)
+    case messageShotShowDate(Bool)
+    case messageShotShowReactions(Bool)
+    case messageShotShowHeaderDecorations(Bool)
+    case messageShotShowColorfulReplies(Bool)
+    case messageShotRevealSpoilers(Bool)
+    case messageShotEmbeddedTheme(Bool)
 
     case filtersHeader
     case filtersEnabled(Bool)
@@ -122,6 +133,8 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return AyuGramSettingsSection.ghostMode.rawValue
         case .messageHistoryHeader, .saveDeletedMessages, .saveMessagesHistory:
             return AyuGramSettingsSection.messageHistory.rawValue
+        case .messageShotHeader, .showMessageShot, .messageShotShowBackground, .messageShotShowDate, .messageShotShowReactions, .messageShotShowHeaderDecorations, .messageShotShowColorfulReplies, .messageShotRevealSpoilers, .messageShotEmbeddedTheme:
+            return AyuGramSettingsSection.messageShot.rawValue
         case .filtersHeader, .filtersEnabled, .filtersEnabledInChats, .filtersList:
             return AyuGramSettingsSection.filters.rawValue
         case .appearanceHeader, .semiTransparentDeletedMessages, .messageBubbleRadius, .avatarCorners, .singleCornerRadius, .removeMessageTail, .replaceBottomInfoWithIcons:
@@ -155,6 +168,24 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return 101
         case .saveMessagesHistory:
             return 102
+        case .messageShotHeader:
+            return 150
+        case .showMessageShot:
+            return 151
+        case .messageShotShowBackground:
+            return 152
+        case .messageShotShowDate:
+            return 153
+        case .messageShotShowReactions:
+            return 154
+        case .messageShotShowHeaderDecorations:
+            return 155
+        case .messageShotShowColorfulReplies:
+            return 156
+        case .messageShotRevealSpoilers:
+            return 157
+        case .messageShotEmbeddedTheme:
+            return 158
         case .filtersHeader:
             return 200
         case .filtersEnabled:
@@ -298,6 +329,31 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return ayuGramSwitchItem(presentationData: presentationData, title: "Save Deleted Messages", value: value, section: self.section, arguments: arguments, keyPath: \.saveDeletedMessages)
         case let .saveMessagesHistory(value):
             return ayuGramSwitchItem(presentationData: presentationData, title: "Save Message Edit History", value: value, section: self.section, arguments: arguments, keyPath: \.saveMessagesHistory)
+
+        case .messageShotHeader:
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: "MESSAGE SHOT", sectionId: self.section)
+        case let .showMessageShot(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "Show Message Shot", value: value, section: self.section, arguments: arguments, keyPath: \.showMessageShot)
+        case let .messageShotShowBackground(value):
+            return ayuGramMessageShotSwitchItem(presentationData: presentationData, title: "Background", value: value, section: self.section, arguments: arguments, keyPath: \.showBackground)
+        case let .messageShotShowDate(value):
+            return ayuGramMessageShotSwitchItem(presentationData: presentationData, title: "Date", value: value, section: self.section, arguments: arguments, keyPath: \.showDate)
+        case let .messageShotShowReactions(value):
+            return ayuGramMessageShotSwitchItem(presentationData: presentationData, title: "Reactions", value: value, section: self.section, arguments: arguments, keyPath: \.showReactions)
+        case let .messageShotShowHeaderDecorations(value):
+            return ayuGramMessageShotSwitchItem(presentationData: presentationData, title: "Header Decorations", value: value, section: self.section, arguments: arguments, keyPath: \.showHeaderDecorations)
+        case let .messageShotShowColorfulReplies(value):
+            return ayuGramMessageShotSwitchItem(presentationData: presentationData, title: "Colorful Replies", value: value, section: self.section, arguments: arguments, keyPath: \.showColorfulReplies)
+        case let .messageShotRevealSpoilers(value):
+            return ayuGramMessageShotSwitchItem(presentationData: presentationData, title: "Reveal Spoilers", value: value, section: self.section, arguments: arguments, keyPath: \.revealSpoilers)
+        case let .messageShotEmbeddedTheme(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Embedded Theme", value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.updateSettings { settings in
+                    var settings = settings
+                    settings.messageShotSettings.embeddedThemeType = value ? 0 : -1
+                    return settings
+                }
+            })
 
         case .filtersHeader:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: "FILTERS", sectionId: self.section)
@@ -463,6 +519,23 @@ private func ayuGramSwitchItem(
     })
 }
 
+private func ayuGramMessageShotSwitchItem(
+    presentationData: ItemListPresentationData,
+    title: String,
+    value: Bool,
+    section: ItemListSectionId,
+    arguments: AyuGramSettingsControllerArguments,
+    keyPath: WritableKeyPath<AyuGramMessageShotSettings, Bool>
+) -> ListViewItem {
+    return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: title, value: value, sectionId: section, style: .blocks, updated: { value in
+        arguments.updateSettings { settings in
+            var settings = settings
+            settings.messageShotSettings[keyPath: keyPath] = value
+            return settings
+        }
+    })
+}
+
 private func ayuGramSettingsControllerEntries(settings: AyuGramSettings) -> [AyuGramSettingsControllerEntry] {
     var entries: [AyuGramSettingsControllerEntry] = []
 
@@ -475,6 +548,18 @@ private func ayuGramSettingsControllerEntries(settings: AyuGramSettings) -> [Ayu
     entries.append(.messageHistoryHeader)
     entries.append(.saveDeletedMessages(settings.saveDeletedMessages))
     entries.append(.saveMessagesHistory(settings.saveMessagesHistory))
+
+    entries.append(.messageShotHeader)
+    entries.append(.showMessageShot(settings.showMessageShot))
+    if settings.showMessageShot {
+        entries.append(.messageShotShowBackground(settings.messageShotSettings.showBackground))
+        entries.append(.messageShotShowDate(settings.messageShotSettings.showDate))
+        entries.append(.messageShotShowReactions(settings.messageShotSettings.showReactions))
+        entries.append(.messageShotShowHeaderDecorations(settings.messageShotSettings.showHeaderDecorations))
+        entries.append(.messageShotShowColorfulReplies(settings.messageShotSettings.showColorfulReplies))
+        entries.append(.messageShotRevealSpoilers(settings.messageShotSettings.revealSpoilers))
+        entries.append(.messageShotEmbeddedTheme(settings.messageShotSettings.embeddedThemeType != -1))
+    }
 
     entries.append(.filtersHeader)
     entries.append(.filtersEnabled(settings.filtersEnabled))

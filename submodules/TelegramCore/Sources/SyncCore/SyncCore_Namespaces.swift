@@ -329,6 +329,7 @@ private enum PreferencesKeyValues: Int32 {
     case savedMusicIds = 47
     case emojiGameInfo = 48
     case ayuGramMessageHistoryStore = 49
+    case ayuGramFilterStore = 50
 }
 
 public func applicationSpecificPreferencesKey(_ value: Int32) -> ValueBoxKey {
@@ -607,6 +608,12 @@ public struct PreferencesKeys {
     public static func ayuGramMessageHistoryStore() -> ValueBoxKey {
         let key = ValueBoxKey(length: 4)
         key.setInt32(0, value: PreferencesKeyValues.ayuGramMessageHistoryStore.rawValue)
+        return key
+    }
+
+    public static func ayuGramFilterStore() -> ValueBoxKey {
+        let key = ValueBoxKey(length: 4)
+        key.setInt32(0, value: PreferencesKeyValues.ayuGramFilterStore.rawValue)
         return key
     }
 }

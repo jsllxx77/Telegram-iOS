@@ -12,9 +12,14 @@ import TelegramUIPreferences
 
 private final class AyuGramSettingsControllerArguments {
     let updateSettings: (@escaping (AyuGramSettings) -> AyuGramSettings) -> Void
+    let openFilters: () -> Void
 
-    init(updateSettings: @escaping (@escaping (AyuGramSettings) -> AyuGramSettings) -> Void) {
+    init(
+        updateSettings: @escaping (@escaping (AyuGramSettings) -> AyuGramSettings) -> Void,
+        openFilters: @escaping () -> Void
+    ) {
         self.updateSettings = updateSettings
+        self.openFilters = openFilters
     }
 }
 
@@ -39,6 +44,7 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
 
     case filtersHeader
     case filtersEnabled(Bool)
+    case filtersList
 
     case appearanceHeader
     case semiTransparentDeletedMessages(Bool)
@@ -61,7 +67,7 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return AyuGramSettingsSection.ghostMode.rawValue
         case .messageHistoryHeader, .saveDeletedMessages, .saveMessagesHistory:
             return AyuGramSettingsSection.messageHistory.rawValue
-        case .filtersHeader, .filtersEnabled:
+        case .filtersHeader, .filtersEnabled, .filtersList:
             return AyuGramSettingsSection.filters.rawValue
         case .appearanceHeader, .semiTransparentDeletedMessages, .removeMessageTail:
             return AyuGramSettingsSection.appearance.rawValue
@@ -92,6 +98,8 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return 200
         case .filtersEnabled:
             return 201
+        case .filtersList:
+            return 202
         case .appearanceHeader:
             return 300
         case .semiTransparentDeletedMessages:
@@ -148,6 +156,10 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return ItemListSectionHeaderItem(presentationData: presentationData, text: "FILTERS", sectionId: self.section)
         case let .filtersEnabled(value):
             return ayuGramSwitchItem(presentationData: presentationData, title: "Enable Filters", value: value, section: self.section, arguments: arguments, keyPath: \.filtersEnabled)
+        case .filtersList:
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "Filters", label: "", sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
+                arguments.openFilters()
+            })
 
         case .appearanceHeader:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: "APPEARANCE", sectionId: self.section)
@@ -210,6 +222,7 @@ private func ayuGramSettingsControllerEntries(settings: AyuGramSettings) -> [Ayu
 
     entries.append(.filtersHeader)
     entries.append(.filtersEnabled(settings.filtersEnabled))
+    entries.append(.filtersList)
 
     entries.append(.appearanceHeader)
     entries.append(.semiTransparentDeletedMessages(settings.semiTransparentDeletedMessages))
@@ -254,8 +267,11 @@ private func stringForTranslationProvider(_ value: AyuTranslationProvider) -> St
 }
 
 public func ayuGramSettingsController(context: AccountContext) -> ViewController {
+    var pushControllerImpl: ((ViewController) -> Void)?
     let arguments = AyuGramSettingsControllerArguments(updateSettings: { f in
         let _ = updateAyuGramSettingsInteractively(accountManager: context.sharedContext.accountManager, f).start()
+    }, openFilters: {
+        pushControllerImpl?(ayuGramFiltersController(context: context))
     })
 
     let signal = combineLatest(
@@ -283,5 +299,9 @@ public func ayuGramSettingsController(context: AccountContext) -> ViewController
         return (controllerState, (listState, arguments))
     }
 
-    return ItemListController(context: context, state: signal)
+    let controller = ItemListController(context: context, state: signal)
+    pushControllerImpl = { [weak controller] controllerToPush in
+        (controller?.navigationController as? NavigationController)?.pushViewController(controllerToPush)
+    }
+    return controller
 }

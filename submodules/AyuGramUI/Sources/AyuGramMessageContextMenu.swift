@@ -157,8 +157,7 @@ public func ayuGramMessageContextMenuDescriptors(
         descriptors.append(AyuGramMessageContextMenuDescriptor(
             action: .addFilter,
             title: "Add Filter",
-            iconName: "Chat/Context Menu/AddToFolder",
-            isPlaceholder: true
+            iconName: "Chat/Context Menu/AddToFolder"
         ))
     }
 

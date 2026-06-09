@@ -2475,7 +2475,11 @@ private func ayuGramContextMenuItem(
             if filterText.isEmpty {
                 ayuGramDisplayContextMenuPlaceholder(controllerInteraction: controllerInteraction, text: "Select text before adding a filter.")
             } else {
-                ayuGramDisplayContextMenuPlaceholder(controllerInteraction: controllerInteraction, text: "Filter editing will be available after Task 14.")
+                controllerInteraction.navigationController()?.pushViewController(ayuGramFilterEditController(
+                    context: context,
+                    initialText: filterText,
+                    initialDialogId: message.id.peerId.toInt64()
+                ))
             }
         case .shadowBan:
             f(.dismissWithoutContent)

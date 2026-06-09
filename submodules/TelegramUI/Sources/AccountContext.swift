@@ -30,6 +30,7 @@ private struct AyuGramContextDisplaySettings: Equatable {
     var hidePremiumStatuses: Bool
     var inputControls: AyuGramInputControls
     var drawerControls: AyuGramDrawerControls
+    var webViewControls: AyuGramWebViewControls
 }
 
 private final class DeviceSpecificContactImportContext {
@@ -182,6 +183,7 @@ public final class AccountContextImpl: AccountContext {
     public private(set) var isAyuGramPremiumStatusHidden: Bool = false
     public private(set) var ayuGramInputControls: AyuGramInputControls = .default
     public private(set) var ayuGramDrawerControls: AyuGramDrawerControls = .default
+    public private(set) var ayuGramWebViewControls: AyuGramWebViewControls = .default
     
     public let cachedGroupCallContexts: AccountGroupCallContextCache
     
@@ -586,6 +588,11 @@ public final class AccountContextImpl: AccountContext {
                     showStreamerToggleInDrawer: settings.showStreamerToggleInDrawer,
                     showGhostToggleInTray: settings.showGhostToggleInTray,
                     showStreamerToggleInTray: settings.showStreamerToggleInTray
+                ),
+                webViewControls: AyuGramWebViewControls(
+                    spoofAsAndroid: settings.spoofWebviewAsAndroid,
+                    increaseHeight: settings.increaseWebviewHeight,
+                    increaseWidth: settings.increaseWebviewWidth
                 )
             )
         }
@@ -594,6 +601,7 @@ public final class AccountContextImpl: AccountContext {
             self?.isAyuGramPremiumStatusHidden = value.hidePremiumStatuses
             self?.ayuGramInputControls = value.inputControls
             self?.ayuGramDrawerControls = value.drawerControls
+            self?.ayuGramWebViewControls = value.webViewControls
         })
     }
     

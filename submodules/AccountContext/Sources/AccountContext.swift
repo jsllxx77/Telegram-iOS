@@ -1754,6 +1754,32 @@ public struct AyuGramDrawerControls: Equatable {
     }
 }
 
+public struct AyuGramWebViewControls: Equatable {
+    public static let androidUserAgent = "Mozilla/5.0 (Linux; Android 13; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+
+    public var spoofAsAndroid: Bool
+    public var increaseHeight: Bool
+    public var increaseWidth: Bool
+
+    public init(
+        spoofAsAndroid: Bool,
+        increaseHeight: Bool,
+        increaseWidth: Bool
+    ) {
+        self.spoofAsAndroid = spoofAsAndroid
+        self.increaseHeight = increaseHeight
+        self.increaseWidth = increaseWidth
+    }
+
+    public static var `default`: AyuGramWebViewControls {
+        return AyuGramWebViewControls(
+            spoofAsAndroid: false,
+            increaseHeight: false,
+            increaseWidth: false
+        )
+    }
+}
+
 public protocol AccountContext: AnyObject {
     var sharedContext: SharedAccountContext { get }
     var account: Account { get }
@@ -1791,6 +1817,7 @@ public protocol AccountContext: AnyObject {
     var isAyuGramPremiumStatusHidden: Bool { get }
     var ayuGramInputControls: AyuGramInputControls { get }
     var ayuGramDrawerControls: AyuGramDrawerControls { get }
+    var ayuGramWebViewControls: AyuGramWebViewControls { get }
     var userLimits: EngineConfiguration.UserLimits { get }
     var peerNameColors: PeerNameColors { get }
 

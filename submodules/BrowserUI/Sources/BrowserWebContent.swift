@@ -205,6 +205,7 @@ private func computedUserAgent() -> String {
 final class BrowserWebContent: UIView, BrowserContent, WKNavigationDelegate, WKUIDelegate, UIScrollViewDelegate, WKDownloadDelegate {
     private let context: AccountContext
     private var presentationData: PresentationData
+    private let ayuGramWebViewControls: AyuGramWebViewControls
     
     let webView: WebView
     var readability: Readability?
@@ -243,6 +244,7 @@ final class BrowserWebContent: UIView, BrowserContent, WKNavigationDelegate, WKU
         self.context = context
         self.uuid = UUID()
         self.presentationData = presentationData
+        self.ayuGramWebViewControls = context.ayuGramWebViewControls
         
         var handleScriptMessageImpl: ((WKScriptMessage) -> Void)?
         var handleContentMessageImpl: ((WKScriptMessage) -> Void)?
@@ -311,6 +313,9 @@ final class BrowserWebContent: UIView, BrowserContent, WKNavigationDelegate, WKU
         }
                 
         self.webView = WebView(frame: CGRect(), configuration: configuration)
+        if self.ayuGramWebViewControls.spoofAsAndroid {
+            self.webView.customUserAgent = AyuGramWebViewControls.androidUserAgent
+        }
         self.webView.allowsLinkPreview = true
                 
         if #available(iOS 11.0, *) {
@@ -770,12 +775,15 @@ final class BrowserWebContent: UIView, BrowserContent, WKNavigationDelegate, WKU
         
         let currentBounds = self.webView.scrollView.bounds
         let offsetToBottomEdge = max(0.0, self.webView.scrollView.contentSize.height - currentBounds.maxY)
-        var bottomInset = insets.bottom
+        let topInset = self.ayuGramWebViewControls.increaseHeight ? 0.0 : insets.top
+        let leftInset = self.ayuGramWebViewControls.increaseWidth ? 0.0 : insets.left
+        let rightInset = self.ayuGramWebViewControls.increaseWidth ? 0.0 : insets.right
+        var bottomInset = self.ayuGramWebViewControls.increaseHeight ? min(insets.bottom, safeInsets.bottom) : insets.bottom
         if offsetToBottomEdge < 128.0 {
-            bottomInset = fullInsets.bottom
+            bottomInset = self.ayuGramWebViewControls.increaseHeight ? min(fullInsets.bottom, safeInsets.bottom) : fullInsets.bottom
         }
         
-        let webViewFrame = CGRect(origin: CGPoint(x: insets.left, y: insets.top), size: CGSize(width: size.width - insets.left - insets.right, height: size.height - insets.top - bottomInset))
+        let webViewFrame = CGRect(origin: CGPoint(x: leftInset, y: topInset), size: CGSize(width: size.width - leftInset - rightInset, height: size.height - topInset - bottomInset))
         var refresh = false
         if self.webView.frame.width > 0 && webViewFrame.width != self.webView.frame.width {
             refresh = true

@@ -4,6 +4,7 @@ import Display
 import WebKit
 import SwiftSignalKit
 import TelegramCore
+import AccountContext
 
 private let findActiveElementY = """
 function getOffset(el) {
@@ -133,7 +134,7 @@ final class WebAppWebView: WKWebView {
         return UIEdgeInsets(top: self.customInsets.top, left: self.customInsets.left, bottom: self.customInsets.bottom, right: self.customInsets.right)
     }
     
-    init(account: Account) {
+    init(account: Account, webViewControls: AyuGramWebViewControls) {
         let configuration = WKWebViewConfiguration()
                 
         if #available(iOS 17.0, *) {
@@ -184,6 +185,10 @@ final class WebAppWebView: WKWebView {
         }
         
         super.init(frame: CGRect(), configuration: configuration)
+
+        if webViewControls.spoofAsAndroid {
+            self.customUserAgent = AyuGramWebViewControls.androidUserAgent
+        }
         
         self.disablesInteractiveKeyboardGestureRecognizer = true
         

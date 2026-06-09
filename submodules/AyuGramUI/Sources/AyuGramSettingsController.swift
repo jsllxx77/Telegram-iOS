@@ -38,6 +38,7 @@ private enum AyuGramSettingsSection: Int32 {
     case composer
     case drawer
     case translation
+    case webView
     case advanced
 }
 
@@ -106,6 +107,11 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
     case translationHeader
     case translationProvider(AyuTranslationProvider)
 
+    case webViewHeader
+    case spoofWebviewAsAndroid(Bool)
+    case increaseWebviewHeight(Bool)
+    case increaseWebviewWidth(Bool)
+
     case advancedHeader
     case crashReporting(Bool)
 
@@ -127,6 +133,8 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return AyuGramSettingsSection.drawer.rawValue
         case .translationHeader, .translationProvider:
             return AyuGramSettingsSection.translation.rawValue
+        case .webViewHeader, .spoofWebviewAsAndroid, .increaseWebviewHeight, .increaseWebviewWidth:
+            return AyuGramSettingsSection.webView.rawValue
         case .advancedHeader, .crashReporting:
             return AyuGramSettingsSection.advanced.rawValue
         }
@@ -246,6 +254,14 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return 500
         case .translationProvider:
             return 501
+        case .webViewHeader:
+            return 520
+        case .spoofWebviewAsAndroid:
+            return 521
+        case .increaseWebviewHeight:
+            return 522
+        case .increaseWebviewWidth:
+            return 523
         case .advancedHeader:
             return 600
         case .crashReporting:
@@ -408,6 +424,15 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
                 presentTranslationProviderSheet(presentationData: arguments.presentationData(), current: value, arguments: arguments)
             })
 
+        case .webViewHeader:
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: "WEB VIEW", sectionId: self.section)
+        case let .spoofWebviewAsAndroid(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "Spoof as Android", value: value, section: self.section, arguments: arguments, keyPath: \.spoofWebviewAsAndroid)
+        case let .increaseWebviewHeight(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "Increase WebView Height", value: value, section: self.section, arguments: arguments, keyPath: \.increaseWebviewHeight)
+        case let .increaseWebviewWidth(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "Increase WebView Width", value: value, section: self.section, arguments: arguments, keyPath: \.increaseWebviewWidth)
+
         case .advancedHeader:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: "ADVANCED", sectionId: self.section)
         case let .crashReporting(value):
@@ -501,6 +526,11 @@ private func ayuGramSettingsControllerEntries(settings: AyuGramSettings) -> [Ayu
 
     entries.append(.translationHeader)
     entries.append(.translationProvider(settings.translationProvider))
+
+    entries.append(.webViewHeader)
+    entries.append(.spoofWebviewAsAndroid(settings.spoofWebviewAsAndroid))
+    entries.append(.increaseWebviewHeight(settings.increaseWebviewHeight))
+    entries.append(.increaseWebviewWidth(settings.increaseWebviewWidth))
 
     entries.append(.advancedHeader)
     entries.append(.crashReporting(settings.crashReporting))

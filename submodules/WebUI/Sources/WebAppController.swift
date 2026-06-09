@@ -270,7 +270,7 @@ public final class WebAppController: ViewController, AttachmentContainable {
                 self.backgroundColor = self.presentationData.theme.list.plainBackgroundColor
             }
             
-            let webView = WebAppWebView(account: context.account)
+            let webView = WebAppWebView(account: context.account, webViewControls: context.ayuGramWebViewControls)
             webView.alpha = 0.0
             webView.navigationDelegate = self
             webView.uiDelegate = self
@@ -972,8 +972,9 @@ public final class WebAppController: ViewController, AttachmentContainable {
                     scrollInset.bottom = 0.0
                 }
                 
-                let topInset: CGFloat = controller.isFullscreen ? 0.0 : navigationBarHeight
-                
+                let webViewControls = self.context.ayuGramWebViewControls
+                let topInset: CGFloat = controller.isFullscreen || webViewControls.increaseHeight ? 0.0 : navigationBarHeight
+
                 let webViewFrame = CGRect(origin: CGPoint(x: 0.0, y: topInset), size: CGSize(width: layout.size.width, height: max(1.0, layout.size.height - topInset - frameBottomInset)))
                 if !webView.frame.width.isZero && webView.frame != webViewFrame {
                     self.updateWebViewWhenStable = true
@@ -983,7 +984,9 @@ public final class WebAppController: ViewController, AttachmentContainable {
                 if (self.validLayout?.0.inputHeight ?? 0.0) < 44.0 {
                     viewportBottomInset += layout.additionalInsets.bottom
                 }
-                let viewportFrame = CGRect(origin: CGPoint(x: layout.safeInsets.left, y: topInset), size: CGSize(width: layout.size.width - layout.safeInsets.left - layout.safeInsets.right, height: max(1.0, layout.size.height - topInset - viewportBottomInset)))
+                let viewportLeftInset = webViewControls.increaseWidth ? 0.0 : layout.safeInsets.left
+                let viewportRightInset = webViewControls.increaseWidth ? 0.0 : layout.safeInsets.right
+                let viewportFrame = CGRect(origin: CGPoint(x: viewportLeftInset, y: topInset), size: CGSize(width: layout.size.width - viewportLeftInset - viewportRightInset, height: max(1.0, layout.size.height - topInset - viewportBottomInset)))
                 
                 if webView.scrollView.contentInset != scrollInset {
                     webView.scrollView.contentInset = scrollInset
@@ -1028,8 +1031,8 @@ public final class WebAppController: ViewController, AttachmentContainable {
                 } else {
                     customInsets.bottom = layout.intrinsicInsets.bottom
                 }
-                customInsets.left = layout.safeInsets.left
-                customInsets.right = layout.safeInsets.left
+                customInsets.left = webViewControls.increaseWidth ? 0.0 : layout.safeInsets.left
+                customInsets.right = webViewControls.increaseWidth ? 0.0 : layout.safeInsets.right
                 webView.customInsets = customInsets
                 
                 if let controller = self.controller {

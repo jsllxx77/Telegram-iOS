@@ -9,6 +9,32 @@ import SwiftSignalKit
 import TelegramPresentationData
 import TelegramUIPreferences
 
+public struct ChatMessageItemAyuGramData: Equatable {
+    public static let defaultValue = ChatMessageItemAyuGramData(
+        showMessageSeconds: false,
+        hideFastShare: false,
+        hideSimilarChannels: false,
+        peerIdDisplay: 0
+    )
+
+    public let showMessageSeconds: Bool
+    public let hideFastShare: Bool
+    public let hideSimilarChannels: Bool
+    public let peerIdDisplay: Int32
+
+    public init(
+        showMessageSeconds: Bool,
+        hideFastShare: Bool,
+        hideSimilarChannels: Bool,
+        peerIdDisplay: Int32
+    ) {
+        self.showMessageSeconds = showMessageSeconds
+        self.hideFastShare = hideFastShare
+        self.hideSimilarChannels = hideSimilarChannels
+        self.peerIdDisplay = peerIdDisplay
+    }
+}
+
 public final class ChatMessageItemAssociatedData: Equatable {
     public enum ChannelDiscussionGroupStatus: Equatable {
         case unknown
@@ -69,6 +95,7 @@ public final class ChatMessageItemAssociatedData: Equatable {
     public let accountCountry: String?
     public let isParticipant: Bool
     public let invitedOn: Int32?
+    public let ayuGramData: ChatMessageItemAyuGramData
     
     public init(
         automaticDownloadPeerType: MediaAutoDownloadPeerType,
@@ -108,7 +135,8 @@ public final class ChatMessageItemAssociatedData: Equatable {
         showTextAsPlaceholder: Bool = false,
         accountCountry: String? = nil,
         isParticipant: Bool = false,
-        invitedOn: Int32? = nil
+        invitedOn: Int32? = nil,
+        ayuGramData: ChatMessageItemAyuGramData = .defaultValue
     ) {
         self.automaticDownloadPeerType = automaticDownloadPeerType
         self.automaticDownloadPeerId = automaticDownloadPeerId
@@ -148,6 +176,7 @@ public final class ChatMessageItemAssociatedData: Equatable {
         self.accountCountry = accountCountry
         self.isParticipant = isParticipant
         self.invitedOn = invitedOn
+        self.ayuGramData = ayuGramData
     }
     
     public static func == (lhs: ChatMessageItemAssociatedData, rhs: ChatMessageItemAssociatedData) -> Bool {
@@ -251,6 +280,9 @@ public final class ChatMessageItemAssociatedData: Equatable {
             return false
         }
         if lhs.invitedOn != rhs.invitedOn {
+            return false
+        }
+        if lhs.ayuGramData != rhs.ayuGramData {
             return false
         }
         return true

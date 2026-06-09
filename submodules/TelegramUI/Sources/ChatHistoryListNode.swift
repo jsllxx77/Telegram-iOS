@@ -283,7 +283,7 @@ private func mappedInsertEntries(context: AccountContext, chatLocation: ChatLoca
     if case .customChatContents = chatLocation {
         disableFloatingDateHeaders = true
     }
-    
+
     return entries.map { entry -> ListViewInsertItem in
         switch entry.entry {
             case let .MessageEntry(message, presentationData, read, location, selection, attributes):
@@ -324,7 +324,7 @@ private func mappedInsertEntries(context: AccountContext, chatLocation: ChatLoca
                 case let .botInfo(title, text, photo, video, peer, managedByBot):
                     item = ChatBotInfoItem(title: title, text: text, photo: photo, video: video, peer: peer, managedByBot: managedByBot, controllerInteraction: controllerInteraction, presentationData: presentationData, context: context)
                 case let .userInfo(peer, verification, registrationDate, phoneCountry, groupsInCommonCount):
-                    item = ChatUserInfoItem(peer: peer, verification: verification, registrationDate: registrationDate, phoneCountry: phoneCountry, groupsInCommonCount: groupsInCommonCount, controllerInteraction: controllerInteraction, presentationData: presentationData, context: context)
+                    item = ChatUserInfoItem(peer: peer, verification: verification, registrationDate: registrationDate, phoneCountry: phoneCountry, groupsInCommonCount: groupsInCommonCount, peerIdText: ayuGramPeerIdText(peerId: peer.id, display: associatedData.ayuGramData.peerIdDisplay), controllerInteraction: controllerInteraction, presentationData: presentationData, context: context)
                 case .newThreadInfo:
                     item = ChatNewThreadInfoItem(controllerInteraction: controllerInteraction, presentationData: presentationData, context: context)
                 }
@@ -379,7 +379,7 @@ private func mappedUpdateEntries(context: AccountContext, chatLocation: ChatLoca
                 case let .botInfo(title, text, photo, video, peer, managedByBot):
                     item = ChatBotInfoItem(title: title, text: text, photo: photo, video: video, peer: peer, managedByBot: managedByBot, controllerInteraction: controllerInteraction, presentationData: presentationData, context: context)
                 case let .userInfo(peer, verification, registrationDate, phoneCountry, groupsInCommonCount):
-                    item = ChatUserInfoItem(peer: peer, verification: verification, registrationDate: registrationDate, phoneCountry: phoneCountry, groupsInCommonCount: groupsInCommonCount, controllerInteraction: controllerInteraction, presentationData: presentationData, context: context)
+                    item = ChatUserInfoItem(peer: peer, verification: verification, registrationDate: registrationDate, phoneCountry: phoneCountry, groupsInCommonCount: groupsInCommonCount, peerIdText: ayuGramPeerIdText(peerId: peer.id, display: associatedData.ayuGramData.peerIdDisplay), controllerInteraction: controllerInteraction, presentationData: presentationData, context: context)
                 case .newThreadInfo:
                     item = ChatNewThreadInfoItem(controllerInteraction: controllerInteraction, presentationData: presentationData, context: context)
                 }
@@ -397,6 +397,30 @@ final class ChatHistoryTransactionOpaqueState {
     
     init(historyView: ChatHistoryView) {
         self.historyView = historyView
+    }
+}
+
+private func ayuGramPeerIdText(peerId: PeerId, display: Int32) -> String? {
+    guard let display = AyuPeerIdDisplay(rawValue: display), display != .hidden else {
+        return nil
+    }
+
+    switch display {
+    case .hidden:
+        return nil
+    case .telegramApi:
+        return "Telegram API ID: \(peerId.toInt64())"
+    case .botApi:
+        let rawId = peerId.id._internalGetInt64Value()
+        let botApiId: Int64
+        if peerId.namespace == Namespaces.Peer.CloudChannel {
+            botApiId = -(1_000_000_000_000 + rawId)
+        } else if peerId.namespace == Namespaces.Peer.CloudGroup {
+            botApiId = -rawId
+        } else {
+            botApiId = rawId
+        }
+        return "Bot API ID: \(botApiId)"
     }
 }
 
@@ -429,7 +453,8 @@ private func extractAssociatedData(
     isInline: Bool,
     showSensitiveContent: Bool,
     isSuspiciousPeer: Bool,
-    accountCountry: String?
+    accountCountry: String?,
+    ayuGramData: ChatMessageItemAyuGramData = .defaultValue
 ) -> ChatMessageItemAssociatedData {
     var automaticDownloadPeerId: EnginePeer.Id?
     var automaticMediaDownloadPeerType: MediaAutoDownloadPeerType = .channel
@@ -490,7 +515,7 @@ private func extractAssociatedData(
         automaticDownloadPeerId = message.peerId
     }
     
-    return ChatMessageItemAssociatedData(automaticDownloadPeerType: automaticMediaDownloadPeerType, automaticDownloadPeerId: automaticDownloadPeerId, automaticDownloadNetworkType: automaticDownloadNetworkType, preferredStoryHighQuality: preferredStoryHighQuality, isRecentActions: false, subject: subject, contactsPeerIds: contactsPeerIds, channelDiscussionGroup: channelDiscussionGroup, animatedEmojiStickers: animatedEmojiStickers, additionalAnimatedEmojiStickers: additionalAnimatedEmojiStickers, currentlyPlayingMessageId: currentlyPlayingMessageId, isCopyProtectionEnabled: isCopyProtectionEnabled, availableReactions: availableReactions, availableMessageEffects: availableMessageEffects, savedMessageTags: savedMessageTags, defaultReaction: defaultReaction, areStarReactionsEnabled: areStarReactionsEnabled, isPremium: isPremium, accountPeer: accountPeer, alwaysDisplayTranscribeButton: alwaysDisplayTranscribeButton, topicAuthorId: topicAuthorId, hasBots: hasBots, translateToLanguage: translateToLanguage, maxReadStoryId: maxReadStoryId, recommendedChannels: recommendedChannels, audioTranscriptionTrial: audioTranscriptionTrial, chatThemes: chatThemes, deviceContactsNumbers: deviceContactsNumbers, isInline: isInline, showSensitiveContent: showSensitiveContent, isSuspiciousPeer: isSuspiciousPeer, accountCountry: accountCountry, isParticipant: isParticipant, invitedOn: invitedOn)
+    return ChatMessageItemAssociatedData(automaticDownloadPeerType: automaticMediaDownloadPeerType, automaticDownloadPeerId: automaticDownloadPeerId, automaticDownloadNetworkType: automaticDownloadNetworkType, preferredStoryHighQuality: preferredStoryHighQuality, isRecentActions: false, subject: subject, contactsPeerIds: contactsPeerIds, channelDiscussionGroup: channelDiscussionGroup, animatedEmojiStickers: animatedEmojiStickers, additionalAnimatedEmojiStickers: additionalAnimatedEmojiStickers, currentlyPlayingMessageId: currentlyPlayingMessageId, isCopyProtectionEnabled: isCopyProtectionEnabled, availableReactions: availableReactions, availableMessageEffects: availableMessageEffects, savedMessageTags: savedMessageTags, defaultReaction: defaultReaction, areStarReactionsEnabled: areStarReactionsEnabled, isPremium: isPremium, accountPeer: accountPeer, alwaysDisplayTranscribeButton: alwaysDisplayTranscribeButton, topicAuthorId: topicAuthorId, hasBots: hasBots, translateToLanguage: translateToLanguage, maxReadStoryId: maxReadStoryId, recommendedChannels: recommendedChannels, audioTranscriptionTrial: audioTranscriptionTrial, chatThemes: chatThemes, deviceContactsNumbers: deviceContactsNumbers, isInline: isInline, showSensitiveContent: showSensitiveContent, isSuspiciousPeer: isSuspiciousPeer, accountCountry: accountCountry, isParticipant: isParticipant, invitedOn: invitedOn, ayuGramData: ayuGramData)
 }
 
 private extension ChatHistoryLocationInput {
@@ -2230,7 +2255,14 @@ public final class ChatHistoryListNodeImpl: ListViewImpl, ChatHistoryNode, ChatH
                     isSuspiciousPeer = true
                 }
                 
-                let associatedData = extractAssociatedData(chatLocation: chatLocation, view: view, automaticDownloadNetworkType: networkType, preferredStoryHighQuality: preferredStoryHighQuality, animatedEmojiStickers: animatedEmojiStickers, additionalAnimatedEmojiStickers: additionalAnimatedEmojiStickers, subject: subject, currentlyPlayingMessageId: currentlyPlayingMessageIdAndType?.0, isCopyProtectionEnabled: isCopyProtectionEnabled, availableReactions: availableReactions, availableMessageEffects: availableMessageEffects, savedMessageTags: savedMessageTags, defaultReaction: defaultReaction.0, areStarReactionsEnabled: defaultReaction.1, isPremium: isPremium, alwaysDisplayTranscribeButton: alwaysDisplayTranscribeButton, accountPeer: accountPeer, topicAuthorId: topicAuthorId, hasBots: chatHasBots, translateToLanguage: translateToLanguage?.toLang, maxReadStoryId: maxReadStoryId, recommendedChannels: recommendedChannels, audioTranscriptionTrial: audioTranscriptionTrial, chatThemes: chatThemes, deviceContactsNumbers: deviceContactsNumbers, isInline: !rotated, showSensitiveContent: contentSettings.ignoreContentRestrictionReasons.contains("sensitive"), isSuspiciousPeer: isSuspiciousPeer, accountCountry: accountCountry)
+                let ayuGramData = ChatMessageItemAyuGramData(
+                    showMessageSeconds: ayuGramSettings.showMessageSeconds,
+                    hideFastShare: ayuGramSettings.hideFastShare,
+                    hideSimilarChannels: ayuGramSettings.hideSimilarChannels,
+                    peerIdDisplay: ayuGramSettings.showPeerId.rawValue
+                )
+                let effectiveRecommendedChannels = ayuGramSettings.hideSimilarChannels ? nil : recommendedChannels
+                let associatedData = extractAssociatedData(chatLocation: chatLocation, view: view, automaticDownloadNetworkType: networkType, preferredStoryHighQuality: preferredStoryHighQuality, animatedEmojiStickers: animatedEmojiStickers, additionalAnimatedEmojiStickers: additionalAnimatedEmojiStickers, subject: subject, currentlyPlayingMessageId: currentlyPlayingMessageIdAndType?.0, isCopyProtectionEnabled: isCopyProtectionEnabled, availableReactions: availableReactions, availableMessageEffects: availableMessageEffects, savedMessageTags: savedMessageTags, defaultReaction: defaultReaction.0, areStarReactionsEnabled: defaultReaction.1, isPremium: isPremium, alwaysDisplayTranscribeButton: alwaysDisplayTranscribeButton, accountPeer: accountPeer, topicAuthorId: topicAuthorId, hasBots: chatHasBots, translateToLanguage: translateToLanguage?.toLang, maxReadStoryId: maxReadStoryId, recommendedChannels: effectiveRecommendedChannels, audioTranscriptionTrial: audioTranscriptionTrial, chatThemes: chatThemes, deviceContactsNumbers: deviceContactsNumbers, isInline: !rotated, showSensitiveContent: contentSettings.ignoreContentRestrictionReasons.contains("sensitive"), isSuspiciousPeer: isSuspiciousPeer, accountCountry: accountCountry, ayuGramData: ayuGramData)
                 
                 var includeEmbeddedSavedChatInfo = false
                 if case let .replyThread(message) = chatLocation, message.peerId == context.account.peerId, !rotated {
@@ -2413,7 +2445,7 @@ public final class ChatHistoryListNodeImpl: ListViewImpl, ChatHistoryNode, ChatH
                 }
                 
                 if let strongSelf = self {
-                    if let recommendedChannels, !recommendedChannels.channels.isEmpty && !recommendedChannels.isHidden {
+                    if let recommendedChannels = effectiveRecommendedChannels, !recommendedChannels.channels.isEmpty && !recommendedChannels.isHidden {
                         if !strongSelf.didSetupRecommendedChannelsPreload {
                             strongSelf.didSetupRecommendedChannelsPreload = true
                             let preloadDisposable = DisposableSet()

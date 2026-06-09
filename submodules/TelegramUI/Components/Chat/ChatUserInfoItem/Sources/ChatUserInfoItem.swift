@@ -24,6 +24,7 @@ public final class ChatUserInfoItem: ListViewItem {
     fileprivate let registrationDate: String?
     fileprivate let phoneCountry: String?
     fileprivate let groupsInCommonCount: Int32
+    fileprivate let peerIdText: String?
     fileprivate let controllerInteraction: ChatControllerInteraction
     fileprivate let presentationData: ChatPresentationData
     fileprivate let context: AccountContext
@@ -34,6 +35,7 @@ public final class ChatUserInfoItem: ListViewItem {
         registrationDate: String?,
         phoneCountry: String?,
         groupsInCommonCount: Int32,
+        peerIdText: String? = nil,
         controllerInteraction: ChatControllerInteraction,
         presentationData: ChatPresentationData,
         context: AccountContext
@@ -43,6 +45,7 @@ public final class ChatUserInfoItem: ListViewItem {
         self.registrationDate = registrationDate
         self.phoneCountry = phoneCountry
         self.groupsInCommonCount = groupsInCommonCount
+        self.peerIdText = peerIdText
         self.controllerInteraction = controllerInteraction
         self.presentationData = presentationData
         self.context = context
@@ -386,7 +389,13 @@ public final class ChatUserInfoItemNode: ListViewItemNode, ASGestureRecognizerDe
             backgroundSize.height += titleLayout.size.height
             backgroundSize.height += verticalSpacing
             
-            let (subtitleLayout, subtitleApply) = makeSubtitleLayout(TextNodeLayoutArguments(attributedString: NSAttributedString(string: item.presentationData.strings.Chat_NonContactUser_Subtitle, font: Font.regular(13.0), textColor: subtitleColor), backgroundColor: nil, maximumNumberOfLines: 0, truncationType: .end, constrainedSize: CGSize(width: titleConstrainedWidth, height: CGFloat.greatestFiniteMagnitude), alignment: .natural, cutout: nil, insets: UIEdgeInsets()))
+            let subtitleText: String
+            if let peerIdText = item.peerIdText {
+                subtitleText = "\(item.presentationData.strings.Chat_NonContactUser_Subtitle)\n\(peerIdText)"
+            } else {
+                subtitleText = item.presentationData.strings.Chat_NonContactUser_Subtitle
+            }
+            let (subtitleLayout, subtitleApply) = makeSubtitleLayout(TextNodeLayoutArguments(attributedString: NSAttributedString(string: subtitleText, font: Font.regular(13.0), textColor: subtitleColor), backgroundColor: nil, maximumNumberOfLines: 0, truncationType: .end, constrainedSize: CGSize(width: titleConstrainedWidth, height: CGFloat.greatestFiniteMagnitude), alignment: .natural, cutout: nil, insets: UIEdgeInsets()))
             backgroundSize.height += subtitleLayout.size.height
             backgroundSize.height += verticalSpacing + paragraphSpacing
 

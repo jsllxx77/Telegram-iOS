@@ -9614,7 +9614,10 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
             guard let self else {
                 return
             }
-            let disposable = openUserGeneratedUrl(context: self.context, peerId: self.contentData?.state.peerView?.peerId, url: url, concealed: concealed, skipUrlAuth: skipUrlAuth, skipConcealedAlert: skipConcealedAlert, present: { [weak self] c in
+            let ayuGramSettings = self.ayuGramSettingsValue.with { $0 }
+            let effectiveSkipUrlAuth = skipUrlAuth || ayuGramSettings.disableOpenLinkWarning
+            let effectiveSkipConcealedAlert = skipConcealedAlert || ayuGramSettings.disableOpenLinkWarning
+            let disposable = openUserGeneratedUrl(context: self.context, peerId: self.contentData?.state.peerView?.peerId, url: url, concealed: concealed, skipUrlAuth: effectiveSkipUrlAuth, skipConcealedAlert: effectiveSkipConcealedAlert, present: { [weak self] c in
                 self?.present(c, in: .window(.root))
             }, openResolved: { [weak self] resolved in
                 self?.openResolved(result: resolved, sourceMessageId: message?.id, progress: progress, forceExternal: forceExternal, concealed: concealed, commit: commit)

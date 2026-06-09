@@ -55,6 +55,8 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
     case hideFastShare(Bool)
     case showPeerId(AyuPeerIdDisplay)
     case showMessageSeconds(Bool)
+    case hideSimilarChannels(Bool)
+    case disableOpenLinkWarning(Bool)
 
     case translationHeader
     case translationProvider(AyuTranslationProvider)
@@ -72,7 +74,7 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return AyuGramSettingsSection.filters.rawValue
         case .appearanceHeader, .semiTransparentDeletedMessages, .removeMessageTail:
             return AyuGramSettingsSection.appearance.rawValue
-        case .chatControlsHeader, .hideFastShare, .showPeerId, .showMessageSeconds:
+        case .chatControlsHeader, .hideFastShare, .showPeerId, .showMessageSeconds, .hideSimilarChannels, .disableOpenLinkWarning:
             return AyuGramSettingsSection.chatControls.rawValue
         case .translationHeader, .translationProvider:
             return AyuGramSettingsSection.translation.rawValue
@@ -117,6 +119,10 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return 402
         case .showMessageSeconds:
             return 403
+        case .hideSimilarChannels:
+            return 404
+        case .disableOpenLinkWarning:
+            return 405
         case .translationHeader:
             return 500
         case .translationProvider:
@@ -178,9 +184,19 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
         case let .hideFastShare(value):
             return ayuGramSwitchItem(presentationData: presentationData, title: "Hide Fast Share", value: value, section: self.section, arguments: arguments, keyPath: \.hideFastShare)
         case let .showPeerId(value):
-            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "Show Peer ID", label: stringForPeerIdDisplay(value), sectionId: self.section, style: .blocks, disclosureStyle: .none, action: nil)
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "Show Peer ID", label: stringForPeerIdDisplay(value), sectionId: self.section, style: .blocks, disclosureStyle: .none, action: {
+                arguments.updateSettings { settings in
+                    var settings = settings
+                    settings.showPeerId = nextPeerIdDisplay(settings.showPeerId)
+                    return settings
+                }
+            })
         case let .showMessageSeconds(value):
             return ayuGramSwitchItem(presentationData: presentationData, title: "Show Message Seconds", value: value, section: self.section, arguments: arguments, keyPath: \.showMessageSeconds)
+        case let .hideSimilarChannels(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "Hide Similar Channels", value: value, section: self.section, arguments: arguments, keyPath: \.hideSimilarChannels)
+        case let .disableOpenLinkWarning(value):
+            return ayuGramSwitchItem(presentationData: presentationData, title: "Disable Open Link Warning", value: value, section: self.section, arguments: arguments, keyPath: \.disableOpenLinkWarning)
 
         case .translationHeader:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: "TRANSLATION", sectionId: self.section)
@@ -238,6 +254,8 @@ private func ayuGramSettingsControllerEntries(settings: AyuGramSettings) -> [Ayu
     entries.append(.hideFastShare(settings.hideFastShare))
     entries.append(.showPeerId(settings.showPeerId))
     entries.append(.showMessageSeconds(settings.showMessageSeconds))
+    entries.append(.hideSimilarChannels(settings.hideSimilarChannels))
+    entries.append(.disableOpenLinkWarning(settings.disableOpenLinkWarning))
 
     entries.append(.translationHeader)
     entries.append(.translationProvider(settings.translationProvider))
@@ -256,6 +274,17 @@ private func stringForPeerIdDisplay(_ value: AyuPeerIdDisplay) -> String {
         return "Telegram API"
     case .botApi:
         return "Bot API"
+    }
+}
+
+private func nextPeerIdDisplay(_ value: AyuPeerIdDisplay) -> AyuPeerIdDisplay {
+    switch value {
+    case .hidden:
+        return .telegramApi
+    case .telegramApi:
+        return .botApi
+    case .botApi:
+        return .hidden
     }
 }
 

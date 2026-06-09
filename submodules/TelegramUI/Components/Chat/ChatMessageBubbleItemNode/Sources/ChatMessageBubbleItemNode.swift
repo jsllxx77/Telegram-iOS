@@ -146,7 +146,7 @@ private func contentNodeMessagesAndClassesForItem(_ item: ChatMessageItem) -> ([
                 addedPriceInfo = true
             }
         }
-        
+
         var messageMedia = message.media
         if let updatingMedia = itemAttributes.updatingMedia, messageMedia.isEmpty, case let .update(media) = updatingMedia.media {
             messageMedia.append(media.media)
@@ -1901,6 +1901,10 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
         }
         
         if isInlinePage {
+            needsShareButton = false
+        }
+
+        if item.associatedData.ayuGramData.hideFastShare {
             needsShareButton = false
         }
                         

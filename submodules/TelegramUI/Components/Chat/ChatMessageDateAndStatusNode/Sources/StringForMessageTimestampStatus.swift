@@ -91,7 +91,8 @@ public func stringForMessageTimestampStatus(accountPeerId: PeerId, message: Mess
         timestamp = orignalDate
     }
     
-    var dateText = stringForMessageTimestamp(timestamp: timestamp, dateTimeFormat: dateTimeFormat)
+    let showMessageSeconds = associatedData.ayuGramData.showMessageSeconds
+    var dateText = stringForMessageTimestamp(timestamp: timestamp, dateTimeFormat: dateTimeFormat, withSeconds: showMessageSeconds)
     if timestamp == scheduleWhenOnlineTimestamp {
         dateText = "         "
     }
@@ -149,9 +150,9 @@ public func stringForMessageTimestampStatus(accountPeerId: PeerId, message: Mess
         } else {
             dayText = strings.Date_ChatDateHeaderYear(monthAtIndex(Int(timeinfo.tm_mon), strings: strings), "\(timeinfo.tm_mday)", "\(1900 + timeinfo.tm_year)").string
         }
-        dateText = strings.Message_FullDateFormat(dayText, stringForMessageTimestamp(timestamp: timestamp, dateTimeFormat: dateTimeFormat)).string
+        dateText = strings.Message_FullDateFormat(dayText, stringForMessageTimestamp(timestamp: timestamp, dateTimeFormat: dateTimeFormat, withSeconds: showMessageSeconds)).string
     } else if let forwardInfo = message.forwardInfo, forwardInfo.flags.contains(.isImported) {
-        dateText = strings.Message_ImportedDateFormat(dateStringForDay(strings: strings, dateTimeFormat: dateTimeFormat, timestamp: forwardInfo.date), stringForMessageTimestamp(timestamp: forwardInfo.date, dateTimeFormat: dateTimeFormat), dateText).string
+        dateText = strings.Message_ImportedDateFormat(dateStringForDay(strings: strings, dateTimeFormat: dateTimeFormat, timestamp: forwardInfo.date), stringForMessageTimestamp(timestamp: forwardInfo.date, dateTimeFormat: dateTimeFormat, withSeconds: showMessageSeconds), dateText).string
     }
     
     var authorTitle: String?

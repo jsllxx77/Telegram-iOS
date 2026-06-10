@@ -100,7 +100,12 @@ private func ayuGramDeletedSnapshotMessage(
             deletedMark: settings.deletedMark,
             fallbackDeletedMark: ayuGramDeletedBubbleFallbackMark(languageCode: presentationData.strings.baseLanguageCode)
         ),
-        attributes: [],
+        attributes: [AyuGramDeletedMessageAttribute(
+            originalNamespace: snapshot.messageNamespace,
+            originalId: snapshot.messageId,
+            threadId: snapshot.threadId,
+            createdAt: snapshot.createdAt
+        )],
         media: [],
         peers: SimpleDictionary(peers),
         associatedMessages: SimpleDictionary<MessageId, Message>(),

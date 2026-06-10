@@ -51,6 +51,53 @@ private struct MessageContextMenuData {
     let messageActions: ChatAvailableMessageActions
 }
 
+private func ayuGramDeletedMessageAttribute(_ message: Message) -> AyuGramDeletedMessageAttribute? {
+    return message.attributes.first(where: { $0 is AyuGramDeletedMessageAttribute }) as? AyuGramDeletedMessageAttribute
+}
+
+private func ayuGramDeletedBubbleContextMenuItems(
+    chatPresentationInterfaceState: ChatPresentationInterfaceState,
+    context: AccountContext,
+    message: Message,
+    attribute: AyuGramDeletedMessageAttribute,
+    controllerInteraction: ChatControllerInteraction
+) -> ContextController.Items {
+    let languageCode = chatPresentationInterfaceState.strings.baseLanguageCode
+    let localized: (String) -> String = { value in
+        return ayuGramLocalized(value, languageCode: languageCode)
+    }
+    var actions: [ContextMenuItem] = []
+
+    if !message.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        actions.append(.action(ContextMenuActionItem(text: chatPresentationInterfaceState.strings.Conversation_ContextMenuCopy, icon: { theme in
+            return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Copy"), color: theme.actionSheet.primaryTextColor)
+        }, action: { _, f in
+            storeMessageTextInPasteboard(message.text, entities: nil)
+            Queue.mainQueue().after(0.2, {
+                let content: UndoOverlayContent = .copy(text: chatPresentationInterfaceState.strings.Conversation_MessageCopied)
+                controllerInteraction.displayUndo(content)
+            })
+            f(.default)
+        })))
+    }
+
+    actions.append(.action(ContextMenuActionItem(text: localized("Deleted Messages"), icon: { theme in
+        return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Delete"), color: theme.actionSheet.primaryTextColor)
+    }, action: { _, f in
+        f(.dismissWithoutContent)
+        controllerInteraction.navigationController()?.pushViewController(ayuGramDeletedMessagesController(context: context, peerId: message.id.peerId, threadId: attribute.threadId))
+    })))
+
+    actions.append(.action(ContextMenuActionItem(text: localized("Message Details"), icon: { theme in
+        return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Info"), color: theme.actionSheet.primaryTextColor)
+    }, action: { _, f in
+        f(.dismissWithoutContent)
+        controllerInteraction.navigationController()?.pushViewController(ayuGramMessageDetailsController(context: context, message: message))
+    })))
+
+    return ContextController.Items(content: .list(actions))
+}
+
 func canEditMessage(context: AccountContext, limitsConfiguration: EngineConfiguration.Limits, message: Message) -> Bool {
     return canEditMessage(accountPeerId: context.account.peerId, limitsConfiguration: limitsConfiguration, message: message)
 }
@@ -490,6 +537,15 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
     if let message = messages.first {
         if message.id.namespace < 0 {
             return .single(ContextController.Items(content: .list([])))
+        }
+        if messages.count == 1, let attribute = ayuGramDeletedMessageAttribute(message) {
+            return .single(ayuGramDeletedBubbleContextMenuItems(
+                chatPresentationInterfaceState: chatPresentationInterfaceState,
+                context: context,
+                message: message,
+                attribute: attribute,
+                controllerInteraction: controllerInteraction
+            ))
         }
         if message.id.namespace == Namespaces.Message.Local && message.attributes.contains(where: { $0 is TypingDraftMessageAttribute }) {
             return .single(ContextController.Items(content: .list([])))

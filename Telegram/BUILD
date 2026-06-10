@@ -83,6 +83,12 @@ bool_flag(
     visibility = ["//visibility:public"],
 )
 
+bool_flag(
+    name = "useLegacyAppIcon",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
 config_setting(
     name = "disableExtensionsSetting",
     flag_values = {
@@ -101,6 +107,13 @@ config_setting(
     name = "projectIncludeReleaseSetting",
     flag_values = {
         ":projectIncludeRelease": "True",
+    },
+)
+
+config_setting(
+    name = "useLegacyAppIconSetting",
+    flag_values = {
+        ":useLegacyAppIcon": "True",
     },
 )
 
@@ -1743,7 +1756,10 @@ ios_application(
         ":RequiredDeviceCapabilitiesPlist",
         ":UrlTypesInfoPlist",
     ],
-    app_icons = [ ":{}_icon".format(name) for name in composer_icon_folders ],
+    app_icons = select({
+        ":useLegacyAppIconSetting": [":DefaultAppIcon"],
+        "//conditions:default": [":{}_icon".format(name) for name in composer_icon_folders],
+    }),
     alternate_icons = [
         ":{}".format(name) for name in alternate_icon_folders
     ],

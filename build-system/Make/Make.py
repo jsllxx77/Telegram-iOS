@@ -110,7 +110,7 @@ class BazelCommandLine:
         self.cache_dir = path
 
     def add_additional_args(self, additional_args):
-        self.additional_args = additional_args
+        self.additional_args = shlex.split(additional_args) if additional_args is not None else None
 
     def set_build_number(self, build_number):
         self.build_number = build_number
@@ -234,6 +234,8 @@ class BazelCommandLine:
             combined_arguments += ['--keep_going']
         if self.show_actions:
             combined_arguments += ['--subcommands']
+        if self.additional_args is not None:
+            combined_arguments += self.additional_args
 
         return combined_arguments
 
@@ -280,6 +282,8 @@ class BazelCommandLine:
         combined_arguments += self.common_build_args
         combined_arguments += self.get_define_arguments()
         combined_arguments += self.get_additional_build_arguments()
+        if self.additional_args is not None:
+            combined_arguments += self.additional_args
 
         if self.remote_cache is not None:
             combined_arguments += [
@@ -315,6 +319,8 @@ class BazelCommandLine:
         combined_arguments += self.common_build_args
         combined_arguments += self.get_define_arguments()
         combined_arguments += self.get_additional_build_arguments()
+        if self.additional_args is not None:
+            combined_arguments += self.additional_args
 
         if self.remote_cache is not None:
             combined_arguments += [
@@ -345,6 +351,8 @@ class BazelCommandLine:
         ]
 
         combined_arguments += self.get_define_arguments()
+        if self.additional_args is not None:
+            combined_arguments += self.additional_args
 
         if self.remote_cache is not None:
             combined_arguments += [
@@ -388,6 +396,8 @@ class BazelCommandLine:
         combined_arguments += self.common_build_args
         combined_arguments += self.get_define_arguments()
         combined_arguments += self.get_additional_build_arguments()
+        if self.additional_args is not None:
+            combined_arguments += self.additional_args
 
         if self.remote_cache is not None:
             combined_arguments += [
@@ -412,7 +422,6 @@ def clean(bazel, arguments):
         override_xcode_version=arguments.overrideXcodeVersion,
         bazel_user_root=arguments.bazelUserRoot
     )
-
     bazel_command_line.invoke_clean()
 
 
@@ -520,6 +529,7 @@ def generate_project(bazel, arguments):
         override_xcode_version=arguments.overrideXcodeVersion,
         bazel_user_root=arguments.bazelUserRoot
     )
+    bazel_command_line.add_additional_args(arguments.bazelArguments)
 
     if arguments.cacheDir is not None:
         bazel_command_line.add_cache_dir(arguments.cacheDir)
@@ -592,6 +602,7 @@ def build(bazel, arguments):
         override_xcode_version=arguments.overrideXcodeVersion,
         bazel_user_root=arguments.bazelUserRoot
     )
+    bazel_command_line.add_additional_args(arguments.bazelArguments)
 
     if arguments.lock:
         bazel_command_line.set_lock(True)
@@ -661,6 +672,7 @@ def test(bazel, arguments):
         override_xcode_version=arguments.overrideXcodeVersion,
         bazel_user_root=arguments.bazelUserRoot
     )
+    bazel_command_line.add_additional_args(arguments.bazelArguments)
 
     if arguments.cacheDir is not None:
         bazel_command_line.add_cache_dir(arguments.cacheDir)
@@ -687,6 +699,7 @@ def query(bazel, arguments):
         override_xcode_version=arguments.overrideXcodeVersion,
         bazel_user_root=arguments.bazelUserRoot
     )
+    bazel_command_line.add_additional_args(arguments.bazelArguments)
 
     if arguments.cacheDir is not None:
         bazel_command_line.add_cache_dir(arguments.cacheDir)
@@ -717,6 +730,7 @@ def build_spm(bazel, arguments):
         override_xcode_version=arguments.overrideXcodeVersion,
         bazel_user_root=arguments.bazelUserRoot
     )
+    bazel_command_line.add_additional_args(arguments.bazelArguments)
 
     if arguments.cacheDir is not None:
         bazel_command_line.add_cache_dir(arguments.cacheDir)

@@ -3948,7 +3948,7 @@ private func storeAyuGramEditedMessageSnapshot(
     policy: AccountMessageHistoryPolicy,
     accountPeerId: PeerId,
     previousMessage: Message,
-    updatedMessage: Message,
+    updatedMessage: StoreMessage,
     transaction: Transaction
 ) {
     guard policy.saveMessagesHistory else {

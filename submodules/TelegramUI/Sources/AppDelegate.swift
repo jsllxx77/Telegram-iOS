@@ -55,6 +55,23 @@ private let handleVoipNotifications = false
 
 private var testIsLaunched = false
 
+private struct ApplicationContainer {
+    let url: URL
+    let appGroupIdentifier: String?
+}
+
+private func applicationContainer(baseAppBundleId: String) -> ApplicationContainer {
+    let appGroupIdentifier = "group.\(baseAppBundleId)"
+    if let appGroupUrl = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupIdentifier) {
+        return ApplicationContainer(url: appGroupUrl, appGroupIdentifier: appGroupIdentifier)
+    }
+
+    let baseUrl = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first ?? URL(fileURLWithPath: NSTemporaryDirectory())
+    let fallbackUrl = baseUrl.appendingPathComponent("AyuGram", isDirectory: true)
+    let _ = try? FileManager.default.createDirectory(at: fallbackUrl, withIntermediateDirectories: true, attributes: nil)
+    return ApplicationContainer(url: fallbackUrl, appGroupIdentifier: nil)
+}
+
 private func isKeyboardWindow(window: NSObject) -> Bool {
     let typeName = NSStringFromClass(type(of: window))
     if #available(iOS 9.0, *) {
@@ -286,10 +303,10 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
         }
         
         let baseAppBundleId = Bundle.main.bundleIdentifier!
-        let appGroupName = "group.\(baseAppBundleId)"
+        let container = applicationContainer(baseAppBundleId: baseAppBundleId)
 
         let configuration = URLSessionConfiguration.background(withIdentifier: identifier)
-        configuration.sharedContainerIdentifier = appGroupName
+        configuration.sharedContainerIdentifier = container.appGroupIdentifier
         configuration.isDiscretionary = false
         let session = URLSession(configuration: configuration, delegate: self, delegateQueue: .main)
         self.urlSessions.append(session)
@@ -527,8 +544,8 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
         let appVersion = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "unknown"
         
         let baseAppBundleId = Bundle.main.bundleIdentifier!
-        let appGroupName = "group.\(baseAppBundleId)"
-        let maybeAppGroupUrl = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupName)
+        let container = applicationContainer(baseAppBundleId: baseAppBundleId)
+        let containerUrl = container.url
         
         let buildConfig = BuildConfig(baseAppBundleId: baseAppBundleId)
         self.buildConfig = buildConfig
@@ -639,12 +656,7 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
             useBetaFeatures: !buildConfig.isAppStoreBuild,
             isICloudEnabled: buildConfig.isICloudEnabled
         )
-        
-        guard let appGroupUrl = maybeAppGroupUrl else {
-            self.mainWindow?.presentNative(UIAlertController(title: nil, message: "Error 2", preferredStyle: .alert))
-            return true
-        }
-        
+
         var isDebugConfiguration = false
         #if DEBUG
         isDebugConfiguration = true
@@ -664,14 +676,15 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
 
         let rootPath: String
         if isUITest {
-            let testDataPath = appGroupUrl.path + "/telegram-ui-tests-data"
+            let testDataPath = containerUrl.path + "/telegram-ui-tests-data"
             let _ = try? FileManager.default.removeItem(atPath: testDataPath)
             rootPath = rootPathForBasePath(testDataPath)
         } else {
-            rootPath = rootPathForBasePath(appGroupUrl.path)
+            rootPath = rootPathForBasePath(containerUrl.path)
         }
+        let _ = try? FileManager.default.createDirectory(atPath: rootPath, withIntermediateDirectories: true, attributes: nil)
         if !isUITest {
-            performAppGroupUpgrades(appGroupPath: appGroupUrl.path, rootPath: rootPath)
+            performAppGroupUpgrades(appGroupPath: containerUrl.path, rootPath: rootPath)
         }
         
         let deviceSpecificEncryptionParameters = BuildConfig.deviceSpecificEncryptionParameters(rootPath, baseAppBundleId: baseAppBundleId)
@@ -793,7 +806,7 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
             |> distinctUntilChanged
         )
         
-        let applicationBindings = TelegramApplicationBindings(isMainApp: true, appBundleId: baseAppBundleId, appBuildType: buildConfig.isAppStoreBuild ? .public : .internal, containerPath: appGroupUrl.path, appSpecificScheme: buildConfig.appSpecificUrlScheme, openUrl: { url in
+        let applicationBindings = TelegramApplicationBindings(isMainApp: true, appBundleId: baseAppBundleId, appBuildType: buildConfig.isAppStoreBuild ? .public : .internal, containerPath: containerUrl.path, appSpecificScheme: buildConfig.appSpecificUrlScheme, openUrl: { url in
             var parsedUrl = URL(string: url)
             if let parsed = parsedUrl {
                 if parsed.scheme == nil || parsed.scheme!.isEmpty {
@@ -1078,7 +1091,7 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
         |> mapToSignal { accountManager, initialPresentationDataAndSettings -> Signal<(SharedApplicationContext, LoggingSettings), NoError> in
             self.mainWindow?.hostView.containerView.backgroundColor =  initialPresentationDataAndSettings.presentationData.theme.chatList.backgroundColor
             
-            let legacyBasePath = appGroupUrl.path
+            let legacyBasePath = containerUrl.path
             
             let presentationDataPromise = Promise<PresentationData>()
             let appLockContext = AppLockContextImpl(rootPath: rootPath, window: self.mainWindow!, rootController: self.window?.rootViewController, applicationBindings: applicationBindings, accountManager: accountManager, presentationDataSignal: presentationDataPromise.get(), lockIconInitialFrame: {

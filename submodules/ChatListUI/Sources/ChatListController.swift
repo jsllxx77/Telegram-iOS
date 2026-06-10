@@ -437,7 +437,7 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
         
         let ayuGramSettingsSignal = context.sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.ayuGramSettings])
         |> map { sharedData -> AyuGramSettings in
-            return ayuGramSettings(sharedData: sharedData)
+            return TelegramUIPreferences.ayuGramSettings(sharedData: sharedData)
         }
 
         self.badgeDisposable = (combineLatest(renderedTotalUnreadCount(accountManager: context.sharedContext.accountManager, engine: context.engine), self.presentationDataValue.get(), ayuGramSettingsSignal) |> deliverOnMainQueue).startStrict(next: { [weak self] count, presentationData, ayuGramSettings in
@@ -3943,7 +3943,7 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
             self.context.engine.data.get(TelegramEngine.EngineData.Item.Configuration.UserLimits(isPremium: false)),
             self.context.sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.ayuGramSettings])
             |> map { sharedData -> AyuGramSettings in
-                return ayuGramSettings(sharedData: sharedData)
+                return TelegramUIPreferences.ayuGramSettings(sharedData: sharedData)
             }
         )
         |> deliverOnMainQueue).startStrict(next: { [weak self] countAndFilterItems, peerView, limits, ayuGramSettings in

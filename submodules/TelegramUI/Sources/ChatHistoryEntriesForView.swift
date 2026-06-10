@@ -55,29 +55,78 @@ private func ayuGramDeletedBubbleFallbackMark(languageCode: String) -> String {
 }
 
 private struct AyuGramDeletedBubbleCachedMediaPreview {
-    var resourceId: String
-    var resourceRole: String
-    var path: String
+    var primaryResourceId: String?
+    var primaryPath: String?
+    var thumbnailResourceId: String?
+    var thumbnailPath: String?
+
+    var previewResourceId: String? {
+        return self.thumbnailResourceId ?? self.primaryResourceId
+    }
+
+    var previewResourceRole: String? {
+        if self.thumbnailPath != nil {
+            return AyuGramDeletedBubbleMediaPreviewResourceRole.thumbnail.rawValue
+        } else if self.primaryPath != nil {
+            return AyuGramDeletedBubbleMediaPreviewResourceRole.primary.rawValue
+        } else {
+            return nil
+        }
+    }
+
+    var previewPath: String? {
+        return self.thumbnailPath ?? self.primaryPath
+    }
 }
 
 private func ayuGramDeletedBubbleCachedMediaPreview(
     snapshot: AyuGramMessageSnapshot,
     context: AccountContext
 ) -> AyuGramDeletedBubbleCachedMediaPreview? {
+    var result = AyuGramDeletedBubbleCachedMediaPreview(
+        primaryResourceId: nil,
+        primaryPath: nil,
+        thumbnailResourceId: nil,
+        thumbnailPath: nil
+    )
+
     for candidate in ayuGramDeletedBubbleMediaPreviewResourceCandidates(snapshot) {
-        if let path = context.engine.resources.completedResourcePath(
-            id: EngineMediaResource.Id(candidate.id),
-            pathExtension: nil
-        ) {
-            return AyuGramDeletedBubbleCachedMediaPreview(
-                resourceId: candidate.id,
-                resourceRole: candidate.role.rawValue,
-                path: path
-            )
+        let pathExtensions: [String?]
+        if candidate.role == .primary && (snapshot.mediaKind == "video" || snapshot.mediaKind == "roundVideo") {
+            pathExtensions = ["mp4", "mov", nil]
+        } else {
+            pathExtensions = [nil]
+        }
+
+        var cachedPath: String?
+        for pathExtension in pathExtensions {
+            if let path = context.engine.resources.completedResourcePath(
+                id: EngineMediaResource.Id(candidate.id),
+                pathExtension: pathExtension
+            ) {
+                cachedPath = path
+                break
+            }
+        }
+        guard let path = cachedPath else {
+            continue
+        }
+
+        switch candidate.role {
+        case .primary:
+            result.primaryResourceId = candidate.id
+            result.primaryPath = path
+        case .thumbnail:
+            result.thumbnailResourceId = candidate.id
+            result.thumbnailPath = path
         }
     }
 
-    return nil
+    if result.primaryPath != nil || result.thumbnailPath != nil {
+        return result
+    } else {
+        return nil
+    }
 }
 
 private func ayuGramDeletedSnapshotMessage(
@@ -137,9 +186,13 @@ private func ayuGramDeletedSnapshotMessage(
             mediaFileName: snapshot.mediaFileName,
             mediaDuration: snapshot.mediaDuration,
             mediaDimensions: snapshot.mediaDimensions,
-            mediaPreviewResourceId: cachedMediaPreview?.resourceId,
-            mediaPreviewResourceRole: cachedMediaPreview?.resourceRole,
-            mediaPreviewPath: cachedMediaPreview?.path
+            mediaPreviewResourceId: cachedMediaPreview?.previewResourceId,
+            mediaPreviewResourceRole: cachedMediaPreview?.previewResourceRole,
+            mediaPreviewPath: cachedMediaPreview?.previewPath,
+            mediaPrimaryResourceId: cachedMediaPreview?.primaryResourceId,
+            mediaPrimaryPath: cachedMediaPreview?.primaryPath,
+            mediaThumbnailResourceId: cachedMediaPreview?.thumbnailResourceId,
+            mediaThumbnailPath: cachedMediaPreview?.thumbnailPath
         )],
         media: [],
         peers: SimpleDictionary(peers),

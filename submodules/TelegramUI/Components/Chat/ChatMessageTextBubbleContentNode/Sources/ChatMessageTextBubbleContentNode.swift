@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import AVFoundation
 import AsyncDisplayKit
 import Display
 import TelegramCore
@@ -95,6 +96,57 @@ private func ayuGramDeletedMediaPreviewShouldDisplay(_ attribute: AyuGramDeleted
         || attribute.mediaMimeType != nil
         || attribute.mediaFileName != nil
         || attribute.mediaPreviewPath != nil
+        || attribute.mediaPrimaryPath != nil
+        || attribute.mediaThumbnailPath != nil
+}
+
+private func ayuGramDeletedMediaIsImage(_ attribute: AyuGramDeletedMessageAttribute) -> Bool {
+    return attribute.mediaKind == "image"
+        || attribute.mediaKind == "liveImage"
+        || attribute.mediaKind == "imageFile"
+        || attribute.mediaMimeType?.hasPrefix("image/") == true
+}
+
+private func ayuGramDeletedMediaIsVideo(_ attribute: AyuGramDeletedMessageAttribute) -> Bool {
+    return attribute.mediaKind == "video"
+        || attribute.mediaKind == "roundVideo"
+        || attribute.mediaMimeType?.hasPrefix("video/") == true
+}
+
+private func ayuGramDeletedMediaOpenableImage(attribute: AyuGramDeletedMessageAttribute) -> UIImage? {
+    let candidatePaths = [
+        attribute.mediaPrimaryPath,
+        attribute.mediaPreviewResourceRole == "primary" ? attribute.mediaPreviewPath : nil,
+        attribute.mediaThumbnailPath,
+        attribute.mediaPreviewPath
+    ]
+
+    for path in candidatePaths {
+        if let path, let image = UIImage(contentsOfFile: path) {
+            return image
+        }
+    }
+
+    return nil
+}
+
+private func ayuGramDeletedMediaOpenableVideoPath(attribute: AyuGramDeletedMessageAttribute) -> String? {
+    guard ayuGramDeletedMediaIsVideo(attribute) else {
+        return nil
+    }
+
+    let candidatePaths = [
+        attribute.mediaPrimaryPath,
+        attribute.mediaPreviewResourceRole == "primary" ? attribute.mediaPreviewPath : nil
+    ]
+
+    for path in candidatePaths {
+        if let path, FileManager.default.fileExists(atPath: path) {
+            return path
+        }
+    }
+
+    return nil
 }
 
 private func ayuGramDeletedMediaPreviewPlaceholderImage(
@@ -156,6 +208,157 @@ private func ayuGramDeletedMediaPreviewImage(
         backgroundColor: backgroundColor,
         foregroundColor: foregroundColor
     )
+}
+
+private final class AyuGramDeletedMediaPreviewControllerNode: ASDisplayNode {
+    private weak var controller: AyuGramDeletedMediaPreviewController?
+    private let imageNode: ASImageNode
+
+    init(controller: AyuGramDeletedMediaPreviewController, image: UIImage) {
+        self.controller = controller
+        let imageNode = ASImageNode()
+        imageNode.image = image
+        imageNode.contentMode = .scaleAspectFit
+        self.imageNode = imageNode
+
+        super.init()
+
+        self.backgroundColor = .black
+        self.addSubnode(self.imageNode)
+    }
+
+    override func didLoad() {
+        super.didLoad()
+
+        self.view.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.tapGesture(_:))))
+    }
+
+    @objc private func tapGesture(_ recognizer: UITapGestureRecognizer) {
+        if case .ended = recognizer.state {
+            self.controller?.dismiss(animated: true)
+        }
+    }
+
+    func updateLayout(size: CGSize, transition: ContainedViewLayoutTransition) {
+        transition.updateFrame(node: self.imageNode, frame: CGRect(origin: CGPoint(), size: size))
+    }
+}
+
+private final class AyuGramDeletedMediaVideoPreviewControllerNode: ASDisplayNode {
+    private weak var controller: AyuGramDeletedMediaVideoPreviewController?
+    private let playerNode: ASDisplayNode
+
+    init(controller: AyuGramDeletedMediaVideoPreviewController, player: AVPlayer) {
+        self.controller = controller
+        let playerNode = ASDisplayNode()
+        playerNode.setLayerBlock({
+            let layer = AVPlayerLayer(player: player)
+            layer.videoGravity = .resizeAspect
+            return layer
+        })
+        self.playerNode = playerNode
+
+        super.init()
+
+        self.backgroundColor = .black
+        self.addSubnode(self.playerNode)
+    }
+
+    override func didLoad() {
+        super.didLoad()
+
+        self.view.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.tapGesture(_:))))
+    }
+
+    @objc private func tapGesture(_ recognizer: UITapGestureRecognizer) {
+        if case .ended = recognizer.state {
+            self.controller?.dismiss(animated: true)
+        }
+    }
+
+    func updateLayout(size: CGSize, transition: ContainedViewLayoutTransition) {
+        transition.updateFrame(node: self.playerNode, frame: CGRect(origin: CGPoint(), size: size))
+    }
+}
+
+private final class AyuGramDeletedMediaVideoPreviewController: ViewController {
+    private let player: AVPlayer
+
+    private var controllerNode: AyuGramDeletedMediaVideoPreviewControllerNode {
+        return self.displayNode as! AyuGramDeletedMediaVideoPreviewControllerNode
+    }
+
+    init(path: String) {
+        self.player = AVPlayer(url: URL(fileURLWithPath: path))
+
+        super.init(navigationBarPresentationData: nil)
+
+        self.navigationPresentation = .flatModal
+        self.statusBar.statusBarStyle = .Ignore
+        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .allButUpsideDown)
+        self.blocksBackgroundWhenInOverlay = true
+    }
+
+    required init(coder aDecoder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override public func loadDisplayNode() {
+        self.displayNode = AyuGramDeletedMediaVideoPreviewControllerNode(controller: self, player: self.player)
+        self.displayNodeDidLoad()
+    }
+
+    override public func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+
+        self.player.play()
+    }
+
+    override public func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+
+        self.player.pause()
+    }
+
+    override public func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
+        super.containerLayoutUpdated(layout, transition: transition)
+
+        self.controllerNode.updateLayout(size: layout.size, transition: transition)
+    }
+}
+
+private final class AyuGramDeletedMediaPreviewController: ViewController {
+    private let image: UIImage
+
+    private var controllerNode: AyuGramDeletedMediaPreviewControllerNode {
+        return self.displayNode as! AyuGramDeletedMediaPreviewControllerNode
+    }
+
+    init(image: UIImage) {
+        self.image = image
+
+        super.init(navigationBarPresentationData: nil)
+
+        self.navigationPresentation = .flatModal
+        self.statusBar.statusBarStyle = .Ignore
+        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+        self.blocksBackgroundWhenInOverlay = true
+    }
+
+    required init(coder aDecoder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override public func loadDisplayNode() {
+        self.displayNode = AyuGramDeletedMediaPreviewControllerNode(controller: self, image: self.image)
+        self.displayNodeDidLoad()
+    }
+
+    override public func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
+        super.containerLayoutUpdated(layout, transition: transition)
+
+        self.controllerNode.updateLayout(size: layout.size, transition: transition)
+    }
 }
 
 private func findQuoteRange(string: String, quoteText: String, offset: Int?) -> NSRange? {
@@ -1329,6 +1532,24 @@ public class ChatMessageTextBubbleContentNode: ChatMessageBubbleContentNode {
         } else {
             if let item = self.item, let subject = item.associatedData.subject, case .messageOptions = subject {
                 return ChatMessageBubbleContentTapAction(content: .none)
+            }
+        }
+
+        if case .tap = gesture, let previewNode = self.ayuGramDeletedMediaPreviewNode, previewNode.frame.contains(point) {
+            guard let item = self.item, let attribute = ayuGramDeletedMessageAttribute(item.message) else {
+                return ChatMessageBubbleContentTapAction(content: .custom({}), hasLongTapAction: false)
+            }
+
+            if let videoPath = ayuGramDeletedMediaOpenableVideoPath(attribute: attribute) {
+                return ChatMessageBubbleContentTapAction(content: .custom({
+                    item.controllerInteraction.presentControllerInCurrent(AyuGramDeletedMediaVideoPreviewController(path: videoPath), nil)
+                }), hasLongTapAction: false)
+            } else if let image = ayuGramDeletedMediaOpenableImage(attribute: attribute), ayuGramDeletedMediaIsImage(attribute) || attribute.mediaPreviewPath != nil || attribute.mediaThumbnailPath != nil {
+                return ChatMessageBubbleContentTapAction(content: .custom({
+                    item.controllerInteraction.presentControllerInCurrent(AyuGramDeletedMediaPreviewController(image: image), nil)
+                }), hasLongTapAction: false)
+            } else {
+                return ChatMessageBubbleContentTapAction(content: .custom({}), hasLongTapAction: false)
             }
         }
         

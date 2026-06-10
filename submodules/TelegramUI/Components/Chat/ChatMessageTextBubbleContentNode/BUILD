@@ -9,6 +9,9 @@ swift_library(
     copts = [
         "-warnings-as-errors",
     ],
+    sdk_frameworks = [
+        "AVFoundation",
+    ],
     deps = [
         "//submodules/AsyncDisplayKit",
         "//submodules/Display",

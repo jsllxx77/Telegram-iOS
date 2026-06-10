@@ -14,6 +14,10 @@ public final class AyuGramDeletedMessageAttribute: MessageAttribute {
     public let mediaPreviewResourceId: String?
     public let mediaPreviewResourceRole: String?
     public let mediaPreviewPath: String?
+    public let mediaPrimaryResourceId: String?
+    public let mediaPrimaryPath: String?
+    public let mediaThumbnailResourceId: String?
+    public let mediaThumbnailPath: String?
 
     public init(
         originalNamespace: Int32,
@@ -27,7 +31,11 @@ public final class AyuGramDeletedMessageAttribute: MessageAttribute {
         mediaDimensions: String? = nil,
         mediaPreviewResourceId: String? = nil,
         mediaPreviewResourceRole: String? = nil,
-        mediaPreviewPath: String? = nil
+        mediaPreviewPath: String? = nil,
+        mediaPrimaryResourceId: String? = nil,
+        mediaPrimaryPath: String? = nil,
+        mediaThumbnailResourceId: String? = nil,
+        mediaThumbnailPath: String? = nil
     ) {
         self.originalNamespace = originalNamespace
         self.originalId = originalId
@@ -41,6 +49,10 @@ public final class AyuGramDeletedMessageAttribute: MessageAttribute {
         self.mediaPreviewResourceId = mediaPreviewResourceId
         self.mediaPreviewResourceRole = mediaPreviewResourceRole
         self.mediaPreviewPath = mediaPreviewPath
+        self.mediaPrimaryResourceId = mediaPrimaryResourceId
+        self.mediaPrimaryPath = mediaPrimaryPath
+        self.mediaThumbnailResourceId = mediaThumbnailResourceId
+        self.mediaThumbnailPath = mediaThumbnailPath
     }
 
     public init(decoder: PostboxDecoder) {
@@ -56,6 +68,10 @@ public final class AyuGramDeletedMessageAttribute: MessageAttribute {
         self.mediaPreviewResourceId = decoder.decodeOptionalStringForKey("pr")
         self.mediaPreviewResourceRole = decoder.decodeOptionalStringForKey("pt")
         self.mediaPreviewPath = decoder.decodeOptionalStringForKey("pp")
+        self.mediaPrimaryResourceId = decoder.decodeOptionalStringForKey("ppr")
+        self.mediaPrimaryPath = decoder.decodeOptionalStringForKey("ppp")
+        self.mediaThumbnailResourceId = decoder.decodeOptionalStringForKey("ptr")
+        self.mediaThumbnailPath = decoder.decodeOptionalStringForKey("ptp")
     }
 
     public func encode(_ encoder: PostboxEncoder) {
@@ -88,6 +104,18 @@ public final class AyuGramDeletedMessageAttribute: MessageAttribute {
         }
         if let mediaPreviewPath = self.mediaPreviewPath {
             encoder.encodeString(mediaPreviewPath, forKey: "pp")
+        }
+        if let mediaPrimaryResourceId = self.mediaPrimaryResourceId {
+            encoder.encodeString(mediaPrimaryResourceId, forKey: "ppr")
+        }
+        if let mediaPrimaryPath = self.mediaPrimaryPath {
+            encoder.encodeString(mediaPrimaryPath, forKey: "ppp")
+        }
+        if let mediaThumbnailResourceId = self.mediaThumbnailResourceId {
+            encoder.encodeString(mediaThumbnailResourceId, forKey: "ptr")
+        }
+        if let mediaThumbnailPath = self.mediaThumbnailPath {
+            encoder.encodeString(mediaThumbnailPath, forKey: "ptp")
         }
     }
 }

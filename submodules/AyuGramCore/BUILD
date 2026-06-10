@@ -22,9 +22,6 @@ swift_library(
     srcs = glob([
         "Tests/**/*.swift",
     ]),
-    sdk_frameworks = [
-        "XCTest",
-    ],
     deps = [
         ":AyuGramCore",
     ],

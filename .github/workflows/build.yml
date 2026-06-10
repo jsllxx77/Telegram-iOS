@@ -6,9 +6,16 @@ on:
 
   workflow_dispatch:
 
+permissions:
+  actions: read
+  contents: write
+
 jobs:
   build:
     runs-on: macos-26
+    outputs:
+      build_number: ${{ steps.build_app.outputs.build_number }}
+      app_version: ${{ steps.build_app.outputs.app_version }}
 
     steps:
       - uses: actions/checkout@v2
@@ -39,6 +46,7 @@ jobs:
           mv /Users/Shared/$(basename $GITHUB_WORKSPACE) /Users/Shared/telegram-ios
 
       - name: Build the App
+        id: build_app
         run: |
           set -x
 
@@ -58,6 +66,8 @@ jobs:
           export BUILD_NUMBER="$COMMIT_COUNT"
           echo "BUILD_NUMBER=$(echo $BUILD_NUMBER)" >> $GITHUB_ENV
           echo "APP_VERSION=$(echo $APP_VERSION)" >> $GITHUB_ENV
+          echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "app_version=$APP_VERSION" >> "$GITHUB_OUTPUT"
 
           python3 build-system/Make/ImportCertificates.py --path build-system/fake-codesigning/certs
           python3 -u build-system/Make/Make.py \
@@ -69,37 +79,50 @@ jobs:
             --buildNumber="$BUILD_NUMBER" \
             --outputBuildArtifactsPath="build/artifacts"
 
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: build-${{ env.BUILD_NUMBER }}
-          release_name: Telegram ${{ env.APP_VERSION }} (${{ env.BUILD_NUMBER }})
-          body: |
-            An unsigned build of Telegram for iOS ${{ env.APP_VERSION }} (${{ env.BUILD_NUMBER }})
-          draft: false
-          prerelease: false
+          name: telegram-ios-build
+          path: |
+            /Users/Shared/telegram-ios/build/artifacts/Telegram.ipa
+            /Users/Shared/telegram-ios/build/artifacts/Telegram.DSYMs.zip
+          if-no-files-found: error
 
-      - name: Upload Release IPA
-        id: upload-release-ipa 
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: /Users/Shared/telegram-ios/build/artifacts/Telegram.ipa
-          asset_name: Telegram.ipa
-          asset_content_type: application/zip
+  release:
+    needs: build
+    runs-on: ubuntu-latest
 
-      - name: Upload Release DSYM
-        id: upload-release-dsym 
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: /Users/Shared/telegram-ios/build/artifacts/Telegram.DSYMs.zip
-          asset_name: Telegram.DSYMs.zip
-          asset_content_type: application/zip
+          name: telegram-ios-build
+          path: build/artifacts
+
+      - name: Publish Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG_NAME: build-${{ needs.build.outputs.build_number }}
+          RELEASE_NAME: Telegram ${{ needs.build.outputs.app_version }} (${{ needs.build.outputs.build_number }})
+          RELEASE_BODY: An unsigned build of Telegram for iOS ${{ needs.build.outputs.app_version }} (${{ needs.build.outputs.build_number }})
+        run: |
+          set -euo pipefail
+
+          if gh release view "$TAG_NAME" --repo "$GH_REPO" >/dev/null 2>&1; then
+            gh release edit "$TAG_NAME" \
+              --repo "$GH_REPO" \
+              --title "$RELEASE_NAME" \
+              --notes "$RELEASE_BODY"
+          else
+            gh release create "$TAG_NAME" \
+              --repo "$GH_REPO" \
+              --title "$RELEASE_NAME" \
+              --notes "$RELEASE_BODY"
+          fi
+
+          gh release upload "$TAG_NAME" \
+            --repo "$GH_REPO" \
+            build/artifacts/Telegram.ipa \
+            build/artifacts/Telegram.DSYMs.zip \
+            --clobber

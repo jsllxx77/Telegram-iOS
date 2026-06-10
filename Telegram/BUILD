@@ -46,6 +46,7 @@ load(
     "telegram_bundle_id",
     "telegram_aps_environment",
     "telegram_team_id",
+    "telegram_app_specific_url_scheme",
     "telegram_enable_icloud",
     "telegram_enable_siri",
 )
@@ -416,23 +417,13 @@ plist_fragment(
             <string>{telegram_bundle_id}</string>
             <key>CFBundleURLSchemes</key>
             <array>
-                <string>telegram</string>
-            </array>
-        </dict>
-        <dict>
-            <key>CFBundleTypeRole</key>
-            <string>Viewer</string>
-            <key>CFBundleURLName</key>
-            <string>{telegram_bundle_id}.compatibility</string>
-            <key>CFBundleURLSchemes</key>
-            <array>
-                <string>tg</string>
-                <string>tonsite</string>
+                <string>{telegram_app_specific_url_scheme}</string>
             </array>
         </dict>
     </array>
     """.format(
         telegram_bundle_id = telegram_bundle_id,
+        telegram_app_specific_url_scheme = telegram_app_specific_url_scheme,
     )
 )
 
@@ -625,7 +616,7 @@ plist_fragment(
     template =
     """
     <key>CFBundleDisplayName</key>
-    <string>Telegram</string>
+    <string>AyuGram</string>
     """
 )
 
@@ -958,7 +949,7 @@ plist_fragment(
     <key>CFBundleIdentifier</key>
     <string>{telegram_bundle_id}.Share</string>
     <key>CFBundleName</key>
-    <string>Telegram</string>
+    <string>AyuGram</string>
     <key>CFBundlePackageType</key>
     <string>XPC!</string>
     <key>NSExtension</key>
@@ -1050,7 +1041,7 @@ plist_fragment(
     <key>CFBundleIdentifier</key>
     <string>{telegram_bundle_id}.NotificationContent</string>
     <key>CFBundleName</key>
-    <string>Telegram</string>
+    <string>AyuGram</string>
     <key>CFBundlePackageType</key>
     <string>XPC!</string>
     <key>NSExtension</key>
@@ -1157,7 +1148,7 @@ plist_fragment(
     <key>CFBundleIdentifier</key>
     <string>{telegram_bundle_id}.Widget</string>
     <key>CFBundleName</key>
-    <string>Telegram</string>
+    <string>AyuGram</string>
     <key>CFBundlePackageType</key>
     <string>XPC!</string>
     <key>NSExtension</key>
@@ -1270,7 +1261,7 @@ plist_fragment(
     <key>CFBundleIdentifier</key>
     <string>{telegram_bundle_id}.SiriIntents</string>
     <key>CFBundleName</key>
-    <string>Telegram</string>
+    <string>AyuGram</string>
     <key>CFBundlePackageType</key>
     <string>XPC!</string>
     <key>NSExtension</key>
@@ -1401,7 +1392,7 @@ plist_fragment(
     <key>CFBundleIdentifier</key>
     <string>{telegram_bundle_id}.BroadcastUpload</string>
     <key>CFBundleName</key>
-    <string>Telegram</string>
+    <string>AyuGram</string>
     <key>CFBundlePackageType</key>
     <string>XPC!</string>
     <key>NSExtension</key>
@@ -1495,7 +1486,7 @@ plist_fragment(
     <key>CFBundleIdentifier</key>
     <string>{telegram_bundle_id}.NotificationService</string>
     <key>CFBundleName</key>
-    <string>Telegram</string>
+    <string>AyuGram</string>
     <key>CFBundlePackageType</key>
     <string>XPC!</string>
     <key>NSExtension</key>
@@ -1564,11 +1555,11 @@ plist_fragment(
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
     <key>CFBundleDisplayName</key>
-    <string>Telegram</string>
+    <string>AyuGram</string>
     <key>CFBundleIdentifier</key>
     <string>{telegram_bundle_id}</string>
     <key>CFBundleName</key>
-    <string>Telegram</string>
+    <string>AyuGram</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleSignature</key>

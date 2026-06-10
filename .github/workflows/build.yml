@@ -82,7 +82,7 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: telegram-ios-build
+          name: ayugram-ios-build
           path: |
             /Users/Shared/telegram-ios/build/artifacts/Telegram.ipa
             /Users/Shared/telegram-ios/build/artifacts/Telegram.DSYMs.zip
@@ -96,7 +96,7 @@ jobs:
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
-          name: telegram-ios-build
+          name: ayugram-ios-build
           path: build/artifacts
 
       - name: Publish Release
@@ -104,10 +104,13 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           TAG_NAME: build-${{ needs.build.outputs.build_number }}
-          RELEASE_NAME: Telegram ${{ needs.build.outputs.app_version }} (${{ needs.build.outputs.build_number }})
-          RELEASE_BODY: An unsigned build of Telegram for iOS ${{ needs.build.outputs.app_version }} (${{ needs.build.outputs.build_number }})
+          RELEASE_NAME: AyuGram ${{ needs.build.outputs.app_version }} (${{ needs.build.outputs.build_number }})
+          RELEASE_BODY: An unsigned sideload build of AyuGram for iOS ${{ needs.build.outputs.app_version }} (${{ needs.build.outputs.build_number }})
         run: |
           set -euo pipefail
+
+          cp build/artifacts/Telegram.ipa build/artifacts/AyuGram.ipa
+          cp build/artifacts/Telegram.DSYMs.zip build/artifacts/AyuGram.DSYMs.zip
 
           if gh release view "$TAG_NAME" --repo "$GH_REPO" >/dev/null 2>&1; then
             gh release edit "$TAG_NAME" \
@@ -123,6 +126,6 @@ jobs:
 
           gh release upload "$TAG_NAME" \
             --repo "$GH_REPO" \
-            build/artifacts/Telegram.ipa \
-            build/artifacts/Telegram.DSYMs.zip \
+            build/artifacts/AyuGram.ipa \
+            build/artifacts/AyuGram.DSYMs.zip \
             --clobber

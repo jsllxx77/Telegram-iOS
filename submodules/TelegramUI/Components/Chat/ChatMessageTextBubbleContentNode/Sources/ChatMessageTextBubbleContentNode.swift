@@ -1,6 +1,7 @@
 import Foundation
 import UIKit
 import AVFoundation
+import QuickLook
 import AsyncDisplayKit
 import Display
 import TelegramCore
@@ -113,7 +114,13 @@ private func ayuGramDeletedMediaIsVideo(_ attribute: AyuGramDeletedMessageAttrib
         || attribute.mediaMimeType?.hasPrefix("video/") == true
 }
 
-private func ayuGramDeletedMediaOpenableImage(attribute: AyuGramDeletedMessageAttribute) -> UIImage? {
+private struct AyuGramDeletedMediaOpenableImage {
+    let image: UIImage
+    let path: String?
+    let fileName: String?
+}
+
+private func ayuGramDeletedMediaOpenableImage(attribute: AyuGramDeletedMessageAttribute) -> AyuGramDeletedMediaOpenableImage? {
     let candidatePaths = [
         attribute.mediaPrimaryPath,
         attribute.mediaPreviewResourceRole == "primary" ? attribute.mediaPreviewPath : nil,
@@ -123,7 +130,7 @@ private func ayuGramDeletedMediaOpenableImage(attribute: AyuGramDeletedMessageAt
 
     for path in candidatePaths {
         if let path, let image = UIImage(contentsOfFile: path) {
-            return image
+            return AyuGramDeletedMediaOpenableImage(image: image, path: path, fileName: attribute.mediaFileName)
         }
     }
 
@@ -147,6 +154,65 @@ private func ayuGramDeletedMediaOpenableVideoPath(attribute: AyuGramDeletedMessa
     }
 
     return nil
+}
+
+private func ayuGramDeletedMediaOpenableFilePath(attribute: AyuGramDeletedMessageAttribute) -> String? {
+    if ayuGramDeletedMediaIsImage(attribute) || ayuGramDeletedMediaIsVideo(attribute) {
+        return nil
+    }
+
+    let candidatePaths = [
+        attribute.mediaPrimaryPath,
+        attribute.mediaPreviewResourceRole == "primary" ? attribute.mediaPreviewPath : nil
+    ]
+
+    for path in candidatePaths {
+        if let path, FileManager.default.fileExists(atPath: path) {
+            return path
+        }
+    }
+
+    return nil
+}
+
+private func ayuGramDeletedMediaFileExtension(mimeType: String?) -> String? {
+    guard let mimeType else {
+        return nil
+    }
+    switch mimeType.lowercased() {
+    case "application/pdf":
+        return "pdf"
+    case "text/plain":
+        return "txt"
+    case "application/zip":
+        return "zip"
+    case "application/json":
+        return "json"
+    case "audio/mpeg":
+        return "mp3"
+    case "audio/mp4":
+        return "m4a"
+    case "video/mp4":
+        return "mp4"
+    case "image/jpeg":
+        return "jpg"
+    case "image/png":
+        return "png"
+    case "image/gif":
+        return "gif"
+    default:
+        return nil
+    }
+}
+
+private func ayuGramDeletedMediaDisplayFileName(attribute: AyuGramDeletedMessageAttribute, fallbackExtension: String?) -> String {
+    if let mediaFileName = attribute.mediaFileName, !mediaFileName.isEmpty {
+        return mediaFileName
+    }
+    if let fallbackExtension, !fallbackExtension.isEmpty {
+        return "Deleted Media.\(fallbackExtension)"
+    }
+    return "Deleted Media"
 }
 
 private func ayuGramDeletedMediaPreviewPlaceholderImage(
@@ -210,43 +276,140 @@ private func ayuGramDeletedMediaPreviewImage(
     )
 }
 
-private final class AyuGramDeletedMediaPreviewControllerNode: ASDisplayNode {
+private final class AyuGramDeletedMediaPreviewControllerNode: ASDisplayNode, UIScrollViewDelegate {
     private weak var controller: AyuGramDeletedMediaPreviewController?
-    private let imageNode: ASImageNode
+    private let containerView: UIView
+    private let scrollView: UIScrollView
+    private let imageView: UIImageView
+    private let closeButton: UIButton
+    private let saveButton: UIButton
+    private let shareButton: UIButton
 
     init(controller: AyuGramDeletedMediaPreviewController, image: UIImage) {
         self.controller = controller
-        let imageNode = ASImageNode()
-        imageNode.image = image
-        imageNode.contentMode = .scaleAspectFit
-        self.imageNode = imageNode
+        self.containerView = UIView()
+        self.scrollView = UIScrollView()
+        self.imageView = UIImageView(image: image)
+        self.closeButton = UIButton(type: .system)
+        self.saveButton = UIButton(type: .system)
+        self.shareButton = UIButton(type: .system)
 
         super.init()
 
         self.backgroundColor = .black
-        self.addSubnode(self.imageNode)
+        self.setViewBlock({ [containerView] in
+            return containerView
+        })
     }
 
     override func didLoad() {
         super.didLoad()
 
-        self.view.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.tapGesture(_:))))
+        self.containerView.backgroundColor = .black
+
+        self.scrollView.delegate = self
+        self.scrollView.backgroundColor = .black
+        self.scrollView.maximumZoomScale = 5.0
+        self.scrollView.minimumZoomScale = 1.0
+        self.scrollView.alwaysBounceVertical = true
+        self.scrollView.alwaysBounceHorizontal = true
+        self.scrollView.showsVerticalScrollIndicator = false
+        self.scrollView.showsHorizontalScrollIndicator = false
+
+        self.imageView.contentMode = .scaleAspectFit
+        self.containerView.addSubview(self.scrollView)
+        self.scrollView.addSubview(self.imageView)
+
+        self.configureButton(self.closeButton, title: "Close", action: #selector(self.closePressed))
+        self.configureButton(self.saveButton, title: "Save", action: #selector(self.savePressed))
+        self.configureButton(self.shareButton, title: "Share", action: #selector(self.sharePressed))
+
+        self.containerView.addSubview(self.closeButton)
+        self.containerView.addSubview(self.saveButton)
+        self.containerView.addSubview(self.shareButton)
+
+        let doubleTap = UITapGestureRecognizer(target: self, action: #selector(self.doubleTapGesture(_:)))
+        doubleTap.numberOfTapsRequired = 2
+        self.scrollView.addGestureRecognizer(doubleTap)
     }
 
-    @objc private func tapGesture(_ recognizer: UITapGestureRecognizer) {
-        if case .ended = recognizer.state {
-            self.controller?.dismiss(animated: true)
+    private func configureButton(_ button: UIButton, title: String, action: Selector) {
+        button.setTitle(title, for: .normal)
+        button.setTitleColor(.white, for: .normal)
+        button.titleLabel?.font = Font.semibold(15.0)
+        button.backgroundColor = UIColor(white: 0.0, alpha: 0.45)
+        button.layer.cornerRadius = 17.0
+        button.addTarget(self, action: action, for: .touchUpInside)
+    }
+
+    @objc private func closePressed() {
+        self.controller?.dismiss(animated: true)
+    }
+
+    @objc private func savePressed() {
+        self.controller?.saveImage()
+    }
+
+    @objc private func sharePressed() {
+        self.controller?.shareImage(sourceView: self.shareButton)
+    }
+
+    @objc private func doubleTapGesture(_ recognizer: UITapGestureRecognizer) {
+        guard case .ended = recognizer.state else {
+            return
+        }
+        if self.scrollView.zoomScale > self.scrollView.minimumZoomScale {
+            self.scrollView.setZoomScale(self.scrollView.minimumZoomScale, animated: true)
+        } else {
+            let point = recognizer.location(in: self.imageView)
+            let zoomScale = min(self.scrollView.maximumZoomScale, 2.5)
+            let width = self.scrollView.bounds.width / zoomScale
+            let height = self.scrollView.bounds.height / zoomScale
+            self.scrollView.zoom(to: CGRect(x: point.x - width / 2.0, y: point.y - height / 2.0, width: width, height: height), animated: true)
         }
     }
 
+    func viewForZooming(in scrollView: UIScrollView) -> UIView? {
+        return self.imageView
+    }
+
     func updateLayout(size: CGSize, transition: ContainedViewLayoutTransition) {
-        transition.updateFrame(node: self.imageNode, frame: CGRect(origin: CGPoint(), size: size))
+        self.containerView.frame = CGRect(origin: CGPoint(), size: size)
+        self.scrollView.frame = CGRect(origin: CGPoint(), size: size)
+        self.scrollView.contentSize = size
+        self.imageView.frame = CGRect(origin: CGPoint(), size: size)
+
+        let topInset: CGFloat
+        if #available(iOS 11.0, *) {
+            topInset = self.scrollView.safeAreaInsets.top
+        } else {
+            topInset = 0.0
+        }
+        let bottomInset: CGFloat
+        if #available(iOS 11.0, *) {
+            bottomInset = self.scrollView.safeAreaInsets.bottom
+        } else {
+            bottomInset = 0.0
+        }
+
+        self.closeButton.frame = CGRect(x: 12.0, y: topInset + 12.0, width: 72.0, height: 34.0)
+        self.shareButton.frame = CGRect(x: size.width - 86.0, y: topInset + 12.0, width: 74.0, height: 34.0)
+        self.saveButton.frame = CGRect(x: size.width - 168.0, y: topInset + 12.0, width: 74.0, height: 34.0)
+        self.scrollView.verticalScrollIndicatorInsets = UIEdgeInsets(top: topInset, left: 0.0, bottom: bottomInset, right: 0.0)
     }
 }
 
 private final class AyuGramDeletedMediaVideoPreviewControllerNode: ASDisplayNode {
     private weak var controller: AyuGramDeletedMediaVideoPreviewController?
     private let playerNode: ASDisplayNode
+    private let controlsView: UIView
+    private let closeButton: UIButton
+    private let playButton: UIButton
+    private let saveButton: UIButton
+    private let shareButton: UIButton
+    private let timeLabel: UILabel
+    private let slider: UISlider
+    private var isTrackingSlider = false
 
     init(controller: AyuGramDeletedMediaVideoPreviewController, player: AVPlayer) {
         self.controller = controller
@@ -257,6 +420,13 @@ private final class AyuGramDeletedMediaVideoPreviewControllerNode: ASDisplayNode
             return layer
         })
         self.playerNode = playerNode
+        self.controlsView = UIView()
+        self.closeButton = UIButton(type: .system)
+        self.playButton = UIButton(type: .system)
+        self.saveButton = UIButton(type: .system)
+        self.shareButton = UIButton(type: .system)
+        self.timeLabel = UILabel()
+        self.slider = UISlider()
 
         super.init()
 
@@ -267,28 +437,149 @@ private final class AyuGramDeletedMediaVideoPreviewControllerNode: ASDisplayNode
     override func didLoad() {
         super.didLoad()
 
-        self.view.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.tapGesture(_:))))
+        self.configureButton(self.closeButton, title: "Close", action: #selector(self.closePressed))
+        self.configureButton(self.playButton, title: "Pause", action: #selector(self.playPressed))
+        self.configureButton(self.saveButton, title: "Save", action: #selector(self.savePressed))
+        self.configureButton(self.shareButton, title: "Share", action: #selector(self.sharePressed))
+
+        self.controlsView.backgroundColor = UIColor(white: 0.0, alpha: 0.42)
+        self.controlsView.layer.cornerRadius = 18.0
+
+        self.timeLabel.font = Font.regular(12.0)
+        self.timeLabel.textColor = .white
+        self.timeLabel.textAlignment = .center
+        self.timeLabel.text = "0:00 / 0:00"
+
+        self.slider.minimumValue = 0.0
+        self.slider.maximumValue = 1.0
+        self.slider.value = 0.0
+        self.slider.minimumTrackTintColor = .white
+        self.slider.maximumTrackTintColor = UIColor(white: 1.0, alpha: 0.35)
+        self.slider.addTarget(self, action: #selector(self.sliderTouchDown), for: .touchDown)
+        self.slider.addTarget(self, action: #selector(self.sliderValueChanged), for: .valueChanged)
+        self.slider.addTarget(self, action: #selector(self.sliderTouchEnded), for: [.touchUpInside, .touchUpOutside, .touchCancel])
+
+        self.view.addSubview(self.closeButton)
+        self.view.addSubview(self.controlsView)
+        self.controlsView.addSubview(self.playButton)
+        self.controlsView.addSubview(self.slider)
+        self.controlsView.addSubview(self.timeLabel)
+        self.controlsView.addSubview(self.saveButton)
+        self.controlsView.addSubview(self.shareButton)
     }
 
-    @objc private func tapGesture(_ recognizer: UITapGestureRecognizer) {
-        if case .ended = recognizer.state {
-            self.controller?.dismiss(animated: true)
+    private func configureButton(_ button: UIButton, title: String, action: Selector) {
+        button.setTitle(title, for: .normal)
+        button.setTitleColor(.white, for: .normal)
+        button.titleLabel?.font = Font.semibold(15.0)
+        button.backgroundColor = UIColor(white: 0.0, alpha: 0.45)
+        button.layer.cornerRadius = 17.0
+        button.addTarget(self, action: action, for: .touchUpInside)
+    }
+
+    @objc private func closePressed() {
+        self.controller?.dismiss(animated: true)
+    }
+
+    @objc private func playPressed() {
+        self.controller?.togglePlayback()
+    }
+
+    @objc private func savePressed() {
+        self.controller?.saveVideo()
+    }
+
+    @objc private func sharePressed() {
+        self.controller?.shareVideo(sourceView: self.shareButton)
+    }
+
+    @objc private func sliderTouchDown() {
+        self.isTrackingSlider = true
+    }
+
+    @objc private func sliderValueChanged() {
+        self.controller?.previewSeekProgressChanged(Double(self.slider.value), commit: false)
+    }
+
+    @objc private func sliderTouchEnded() {
+        self.isTrackingSlider = false
+        self.controller?.previewSeekProgressChanged(Double(self.slider.value), commit: true)
+    }
+
+    func updatePlaybackState(isPlaying: Bool) {
+        self.playButton.setTitle(isPlaying ? "Pause" : "Play", for: .normal)
+    }
+
+    func updatePlaybackProgress(currentTime: Double, duration: Double) {
+        let safeDuration = duration.isFinite && duration > 0.0 ? duration : 0.0
+        if !self.isTrackingSlider {
+            if safeDuration > 0.0 {
+                self.slider.value = Float(max(0.0, min(1.0, currentTime / safeDuration)))
+            } else {
+                self.slider.value = 0.0
+            }
         }
+        self.timeLabel.text = "\(self.formatTime(currentTime)) / \(self.formatTime(safeDuration))"
+    }
+
+    private func formatTime(_ value: Double) -> String {
+        guard value.isFinite && value >= 0.0 else {
+            return "0:00"
+        }
+        let totalSeconds = Int(value.rounded())
+        let minutes = totalSeconds / 60
+        let seconds = totalSeconds % 60
+        return "\(minutes):\(seconds < 10 ? "0" : "")\(seconds)"
     }
 
     func updateLayout(size: CGSize, transition: ContainedViewLayoutTransition) {
         transition.updateFrame(node: self.playerNode, frame: CGRect(origin: CGPoint(), size: size))
+
+        let topInset: CGFloat
+        let bottomInset: CGFloat
+        if #available(iOS 11.0, *) {
+            topInset = self.view.safeAreaInsets.top
+            bottomInset = self.view.safeAreaInsets.bottom
+        } else {
+            topInset = 0.0
+            bottomInset = 0.0
+        }
+
+        self.closeButton.frame = CGRect(x: 12.0, y: topInset + 12.0, width: 72.0, height: 34.0)
+
+        let sideInset: CGFloat = 12.0
+        let controlsHeight: CGFloat = 96.0
+        let controlsFrame = CGRect(
+            x: sideInset,
+            y: size.height - bottomInset - controlsHeight - 12.0,
+            width: max(1.0, size.width - sideInset * 2.0),
+            height: controlsHeight
+        )
+        self.controlsView.frame = controlsFrame
+
+        self.playButton.frame = CGRect(x: 12.0, y: 12.0, width: 72.0, height: 34.0)
+        self.saveButton.frame = CGRect(x: controlsFrame.width - 160.0, y: 12.0, width: 70.0, height: 34.0)
+        self.shareButton.frame = CGRect(x: controlsFrame.width - 82.0, y: 12.0, width: 70.0, height: 34.0)
+        self.slider.frame = CGRect(x: 12.0, y: 56.0, width: controlsFrame.width - 110.0, height: 28.0)
+        self.timeLabel.frame = CGRect(x: controlsFrame.width - 92.0, y: 57.0, width: 80.0, height: 24.0)
     }
 }
 
 private final class AyuGramDeletedMediaVideoPreviewController: ViewController {
     private let player: AVPlayer
+    private let path: String
+    private let fileName: String?
+    private var tempFile: TempBoxFile?
+    private var timeObserver: Any?
+    private var isPlaying = false
 
     private var controllerNode: AyuGramDeletedMediaVideoPreviewControllerNode {
         return self.displayNode as! AyuGramDeletedMediaVideoPreviewControllerNode
     }
 
-    init(path: String) {
+    init(path: String, fileName: String?) {
+        self.path = path
+        self.fileName = fileName
         self.player = AVPlayer(url: URL(fileURLWithPath: path))
 
         super.init(navigationBarPresentationData: nil)
@@ -303,21 +594,99 @@ private final class AyuGramDeletedMediaVideoPreviewController: ViewController {
         fatalError("init(coder:) has not been implemented")
     }
 
+    deinit {
+        if let timeObserver = self.timeObserver {
+            self.player.removeTimeObserver(timeObserver)
+        }
+        if let tempFile = self.tempFile {
+            TempBox.shared.dispose(tempFile)
+        }
+    }
+
     override public func loadDisplayNode() {
         self.displayNode = AyuGramDeletedMediaVideoPreviewControllerNode(controller: self, player: self.player)
         self.displayNodeDidLoad()
+
+        let interval = CMTime(seconds: 0.25, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
+        self.timeObserver = self.player.addPeriodicTimeObserver(forInterval: interval, queue: .main, using: { [weak self] _ in
+            self?.updatePlaybackProgress()
+        })
+        self.controllerNode.updatePlaybackState(isPlaying: self.isPlaying)
+        self.updatePlaybackProgress()
     }
 
     override public func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
 
         self.player.play()
+        self.isPlaying = true
+        self.controllerNode.updatePlaybackState(isPlaying: true)
     }
 
     override public func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
 
         self.player.pause()
+        self.isPlaying = false
+        if self.isNodeLoaded {
+            self.controllerNode.updatePlaybackState(isPlaying: false)
+        }
+    }
+
+    fileprivate func togglePlayback() {
+        if self.isPlaying {
+            self.player.pause()
+            self.isPlaying = false
+        } else {
+            self.player.play()
+            self.isPlaying = true
+        }
+        self.controllerNode.updatePlaybackState(isPlaying: self.isPlaying)
+    }
+
+    fileprivate func previewSeekProgressChanged(_ progress: Double, commit: Bool) {
+        let duration = self.currentDuration()
+        guard duration > 0.0 else {
+            return
+        }
+        let targetTime = CMTime(seconds: max(0.0, min(1.0, progress)) * duration, preferredTimescale: 600)
+        if commit {
+            self.player.seek(to: targetTime, toleranceBefore: .zero, toleranceAfter: .zero)
+        }
+        self.controllerNode.updatePlaybackProgress(currentTime: targetTime.seconds, duration: duration)
+    }
+
+    fileprivate func saveVideo() {
+        UISaveVideoAtPathToSavedPhotosAlbum(self.path, nil, nil, nil)
+    }
+
+    fileprivate func shareVideo(sourceView: UIView?) {
+        let fileName = self.fileName ?? "Deleted Video.mp4"
+        let tempFile = TempBox.shared.file(path: self.path, fileName: fileName)
+        self.tempFile = tempFile
+        let activityController = UIActivityViewController(activityItems: [URL(fileURLWithPath: tempFile.path)], applicationActivities: nil)
+        if let sourceView {
+            activityController.popoverPresentationController?.sourceView = sourceView
+            activityController.popoverPresentationController?.sourceRect = sourceView.bounds
+        }
+        self.present(activityController, animated: true, completion: nil)
+    }
+
+    private func updatePlaybackProgress() {
+        guard self.isNodeLoaded else {
+            return
+        }
+        self.controllerNode.updatePlaybackProgress(
+            currentTime: self.player.currentTime().seconds,
+            duration: self.currentDuration()
+        )
+    }
+
+    private func currentDuration() -> Double {
+        if let duration = self.player.currentItem?.duration.seconds, duration.isFinite && duration > 0.0 {
+            return duration
+        }
+        return 0.0
     }
 
     override public func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
@@ -329,13 +698,18 @@ private final class AyuGramDeletedMediaVideoPreviewController: ViewController {
 
 private final class AyuGramDeletedMediaPreviewController: ViewController {
     private let image: UIImage
+    private let path: String?
+    private let fileName: String?
+    private var tempFile: TempBoxFile?
 
     private var controllerNode: AyuGramDeletedMediaPreviewControllerNode {
         return self.displayNode as! AyuGramDeletedMediaPreviewControllerNode
     }
 
-    init(image: UIImage) {
+    init(image: UIImage, path: String?, fileName: String?) {
         self.image = image
+        self.path = path
+        self.fileName = fileName
 
         super.init(navigationBarPresentationData: nil)
 
@@ -349,15 +723,124 @@ private final class AyuGramDeletedMediaPreviewController: ViewController {
         fatalError("init(coder:) has not been implemented")
     }
 
+    deinit {
+        if let tempFile = self.tempFile {
+            TempBox.shared.dispose(tempFile)
+        }
+    }
+
     override public func loadDisplayNode() {
         self.displayNode = AyuGramDeletedMediaPreviewControllerNode(controller: self, image: self.image)
         self.displayNodeDidLoad()
+    }
+
+    fileprivate func saveImage() {
+        UIImageWriteToSavedPhotosAlbum(self.image, nil, nil, nil)
+    }
+
+    fileprivate func shareImage(sourceView: UIView?) {
+        var activityItems: [Any] = []
+        if let path = self.path, FileManager.default.fileExists(atPath: path) {
+            let fileName = self.fileName ?? "Deleted Image.jpg"
+            let tempFile = TempBox.shared.file(path: path, fileName: fileName)
+            self.tempFile = tempFile
+            activityItems.append(URL(fileURLWithPath: tempFile.path))
+        } else {
+            activityItems.append(self.image)
+        }
+
+        let activityController = UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+        if let sourceView {
+            activityController.popoverPresentationController?.sourceView = sourceView
+            activityController.popoverPresentationController?.sourceRect = sourceView.bounds
+        }
+        self.present(activityController, animated: true, completion: nil)
     }
 
     override public func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
         super.containerLayoutUpdated(layout, transition: transition)
 
         self.controllerNode.updateLayout(size: layout.size, transition: transition)
+    }
+}
+
+private final class AyuGramDeletedDocumentPreviewItem: NSObject, QLPreviewItem {
+    private let url: URL
+    private let title: String
+
+    var previewItemURL: URL? {
+        return self.url
+    }
+
+    var previewItemTitle: String? {
+        return self.title
+    }
+
+    init(url: URL, title: String) {
+        self.url = url
+        self.title = title
+    }
+}
+
+private final class AyuGramDeletedDocumentPreviewController: ViewController, QLPreviewControllerDataSource, QLPreviewControllerDelegate {
+    private let item: AyuGramDeletedDocumentPreviewItem
+    private var tempFile: TempBoxFile?
+    private var didPresentPreview = false
+
+    init(path: String, fileName: String) {
+        let tempFile = TempBox.shared.file(path: path, fileName: fileName)
+        self.tempFile = tempFile
+        self.item = AyuGramDeletedDocumentPreviewItem(url: URL(fileURLWithPath: tempFile.path), title: fileName)
+
+        super.init(navigationBarPresentationData: nil)
+
+        self.navigationPresentation = .flatModal
+        self.statusBar.statusBarStyle = .Ignore
+        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .allButUpsideDown)
+        self.blocksBackgroundWhenInOverlay = true
+    }
+
+    required init(coder aDecoder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    deinit {
+        if let tempFile = self.tempFile {
+            TempBox.shared.dispose(tempFile)
+        }
+    }
+
+    override public func loadDisplayNode() {
+        let displayNode = ASDisplayNode()
+        displayNode.backgroundColor = .clear
+        self.displayNode = displayNode
+        self.displayNodeDidLoad()
+    }
+
+    override public func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+
+        if self.didPresentPreview {
+            return
+        }
+        self.didPresentPreview = true
+
+        let previewController = QLPreviewController()
+        previewController.dataSource = self
+        previewController.delegate = self
+        self.present(previewController, animated: true, completion: nil)
+    }
+
+    func numberOfPreviewItems(in controller: QLPreviewController) -> Int {
+        return 1
+    }
+
+    func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> QLPreviewItem {
+        return self.item
+    }
+
+    func previewControllerDidDismiss(_ controller: QLPreviewController) {
+        self.dismiss(animated: false, completion: nil)
     }
 }
 
@@ -1542,11 +2025,20 @@ public class ChatMessageTextBubbleContentNode: ChatMessageBubbleContentNode {
 
             if let videoPath = ayuGramDeletedMediaOpenableVideoPath(attribute: attribute) {
                 return ChatMessageBubbleContentTapAction(content: .custom({
-                    item.controllerInteraction.presentControllerInCurrent(AyuGramDeletedMediaVideoPreviewController(path: videoPath), nil)
+                    item.controllerInteraction.presentControllerInCurrent(AyuGramDeletedMediaVideoPreviewController(path: videoPath, fileName: attribute.mediaFileName), nil)
                 }), hasLongTapAction: false)
-            } else if let image = ayuGramDeletedMediaOpenableImage(attribute: attribute), ayuGramDeletedMediaIsImage(attribute) || attribute.mediaPreviewPath != nil || attribute.mediaThumbnailPath != nil {
+            } else if ayuGramDeletedMediaIsImage(attribute), let openableImage = ayuGramDeletedMediaOpenableImage(attribute: attribute) {
                 return ChatMessageBubbleContentTapAction(content: .custom({
-                    item.controllerInteraction.presentControllerInCurrent(AyuGramDeletedMediaPreviewController(image: image), nil)
+                    item.controllerInteraction.presentControllerInCurrent(AyuGramDeletedMediaPreviewController(image: openableImage.image, path: openableImage.path, fileName: openableImage.fileName), nil)
+                }), hasLongTapAction: false)
+            } else if let filePath = ayuGramDeletedMediaOpenableFilePath(attribute: attribute) {
+                let fileName = ayuGramDeletedMediaDisplayFileName(attribute: attribute, fallbackExtension: ayuGramDeletedMediaFileExtension(mimeType: attribute.mediaMimeType))
+                return ChatMessageBubbleContentTapAction(content: .custom({
+                    item.controllerInteraction.presentControllerInCurrent(AyuGramDeletedDocumentPreviewController(path: filePath, fileName: fileName), nil)
+                }), hasLongTapAction: false)
+            } else if let openableImage = ayuGramDeletedMediaOpenableImage(attribute: attribute), attribute.mediaPreviewPath != nil || attribute.mediaThumbnailPath != nil {
+                return ChatMessageBubbleContentTapAction(content: .custom({
+                    item.controllerInteraction.presentControllerInCurrent(AyuGramDeletedMediaPreviewController(image: openableImage.image, path: openableImage.path, fileName: openableImage.fileName), nil)
                 }), hasLongTapAction: false)
             } else {
                 return ChatMessageBubbleContentTapAction(content: .custom({}), hasLongTapAction: false)

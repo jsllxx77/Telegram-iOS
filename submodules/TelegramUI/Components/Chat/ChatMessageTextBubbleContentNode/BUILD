@@ -11,6 +11,7 @@ swift_library(
     ],
     sdk_frameworks = [
         "AVFoundation",
+        "QuickLook",
     ],
     deps = [
         "//submodules/AsyncDisplayKit",

@@ -95,6 +95,28 @@ private func ayuGramDeletedBubbleContextMenuItems(
         controllerInteraction.navigationController()?.pushViewController(ayuGramMessageDetailsController(context: context, message: message))
     })))
 
+    actions.append(.action(ContextMenuActionItem(text: localized("Remove Local Deleted Record"), textColor: .destructive, icon: { theme in
+        return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Delete"), color: theme.actionSheet.destructiveActionTextColor)
+    }, action: { _, f in
+        f(.dismissWithoutContent)
+        let storeKey = PreferencesKeys.ayuGramMessageHistoryStore()
+        let accountPeerId = context.account.peerId.toInt64()
+        let peerId = message.id.peerId.toInt64()
+        let _ = context.engine.preferences.update(id: storeKey) { entry -> EnginePreferencesEntry? in
+            var store = entry?.get(AyuGramMessageHistoryStore.self) ?? .empty
+            store.removeDeletedSnapshot(
+                accountPeerId: accountPeerId,
+                peerId: peerId,
+                messageNamespace: attribute.originalNamespace,
+                messageId: attribute.originalId
+            )
+            return EnginePreferencesEntry(store)
+        }.start()
+        Queue.mainQueue().after(0.2, {
+            controllerInteraction.displayUndo(.info(title: nil, text: localized("Local deleted record removed."), timeout: nil, customUndoText: nil))
+        })
+    })))
+
     return ContextController.Items(content: .list(actions))
 }
 

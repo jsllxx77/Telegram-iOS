@@ -124,6 +124,23 @@ public struct AyuGramMessageHistoryStore: Codable, Equatable {
         }
     }
 
+    @discardableResult
+    public mutating func removeDeletedSnapshot(
+        accountPeerId: Int64,
+        peerId: Int64,
+        messageNamespace: Int32,
+        messageId: Int32
+    ) -> Bool {
+        return self.removeDeletedSnapshots { snapshot in
+            return snapshot.hasMessageIdentity(
+                accountPeerId: accountPeerId,
+                peerId: peerId,
+                messageNamespace: messageNamespace,
+                messageId: messageId
+            )
+        } != 0
+    }
+
     private func filteredDeletedSnapshots(
         accountPeerId: Int64,
         peerId: Int64,

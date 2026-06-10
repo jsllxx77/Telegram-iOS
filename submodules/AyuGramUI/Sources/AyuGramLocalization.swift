@@ -94,6 +94,8 @@ private let ayuGramChineseStrings: [String: String] = [
     "Deleted Messages": "已删除消息",
     "Edit History": "编辑历史",
     "Clear": "清除",
+    "Remove Local Deleted Record": "移除本地删除记录",
+    "Local deleted record removed.": "已移除本地删除记录。",
     "No deleted messages saved for this chat.": "此聊天尚未保存已删除消息。",
     "No deleted messages match this search.": "没有匹配搜索的已删除消息。",
     "Clear saved deleted-message history for this chat?": "要清除此聊天保存的已删除消息历史吗？",

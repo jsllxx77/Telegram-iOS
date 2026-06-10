@@ -339,6 +339,7 @@ public class GlassBackgroundView: UIView {
     public static var useCustomGlassImpl: Bool = false
     
     public override init(frame: CGRect) {
+        #if compiler(>=6.2)
         if #available(iOS 26.0, *), !GlassBackgroundView.useCustomGlassImpl {
             self.legacyView = nil
             self.legacyHighlightContainerView = nil
@@ -357,6 +358,7 @@ public class GlassBackgroundView: UIView {
             self.foregroundView = nil
             self.shadowView = nil
         } else {
+        #endif
             self.legacyView = LegacyGlassView(frame: CGRect())
             let legacyHighlightContainerView = UIView()
             legacyHighlightContainerView.isUserInteractionEnabled = false
@@ -368,7 +370,9 @@ public class GlassBackgroundView: UIView {
             self.foregroundView = UIImageView()
             
             self.shadowView = UIImageView()
+        #if compiler(>=6.2)
         }
+        #endif
         
         self.maskContainerView = UIView()
         self.maskContainerView.backgroundColor = .white
@@ -574,6 +578,7 @@ public class GlassBackgroundView: UIView {
                 #endif
                 transition.setAlpha(view: foregroundView, alpha: isVisible ? 1.0 : 0.0)
             } else {
+                #if compiler(>=6.2)
                 if let nativeParamsView = self.nativeParamsView, let nativeView = self.nativeView {
                     if #available(iOS 26.0, *) {
                         var glassEffect: UIGlassEffect?
@@ -652,6 +657,7 @@ public class GlassBackgroundView: UIView {
                         }
                     }
                 }
+                #endif
             }
         }
         
@@ -691,6 +697,7 @@ public final class GlassBackgroundContainerView: UIView {
     }
     
     public init(spacing: CGFloat = 7.0) {
+        #if compiler(>=6.2)
         if #available(iOS 26.0, *), !GlassBackgroundView.useCustomGlassImpl {
             let effect = UIGlassContainerEffect()
             effect.spacing = spacing
@@ -703,10 +710,13 @@ public final class GlassBackgroundContainerView: UIView {
             
             self.legacyView = nil
         } else {
+        #endif
             self.nativeView = nil
             self.nativeParamsView = nil
             self.legacyView = ContentView()
+        #if compiler(>=6.2)
         }
+        #endif
         
         super.init(frame: CGRect())
         
@@ -1348,7 +1358,7 @@ public final class GlassContextExtractableContainer: UIView, ContextExtractableC
                 tintColor: normalParams.tintColor,
                 isInteractive: normalParams.isInteractive,
                 isVisible: normalParams.isVisible,
-                transition: mappedTransition,
+                transition: mappedTransition
             )
         case let .extracted(size, cornerRadius, extractionState):
             switch extractionState {

@@ -53,6 +53,111 @@ private final class CachedChatMessageText {
     }
 }
 
+private struct AyuGramDeletedMediaPreviewLayout {
+    let attribute: AyuGramDeletedMessageAttribute
+    let frame: CGRect
+}
+
+private func ayuGramDeletedMessageAttribute(_ message: Message) -> AyuGramDeletedMessageAttribute? {
+    return message.attributes.first(where: { $0 is AyuGramDeletedMessageAttribute }) as? AyuGramDeletedMessageAttribute
+}
+
+private func ayuGramDeletedMediaPreviewDimensions(_ value: String?) -> CGSize? {
+    guard let value else {
+        return nil
+    }
+    let components = value.split(separator: "x", maxSplits: 1)
+    guard components.count == 2, let width = Double(String(components[0])), let height = Double(String(components[1])), width > 0.0, height > 0.0 else {
+        return nil
+    }
+    return CGSize(width: CGFloat(width), height: CGFloat(height))
+}
+
+private func ayuGramDeletedMediaPreviewSize(attribute: AyuGramDeletedMessageAttribute, constrainedWidth: CGFloat) -> CGSize {
+    let maxWidth = min(max(120.0, constrainedWidth), 220.0)
+    let dimensions = ayuGramDeletedMediaPreviewDimensions(attribute.mediaDimensions)
+    let aspectRatio = dimensions.flatMap { value -> CGFloat? in
+        guard value.width > 0.0 && value.height > 0.0 else {
+            return nil
+        }
+        return value.width / value.height
+    } ?? 16.0 / 9.0
+    let isVisualMedia = attribute.mediaKind == "image" || attribute.mediaKind == "liveImage" || attribute.mediaKind == "imageFile" || attribute.mediaKind == "video" || attribute.mediaKind == "roundVideo" || attribute.mediaKind == "animated"
+    if isVisualMedia {
+        return CGSize(width: maxWidth, height: min(max(72.0, floor(maxWidth / aspectRatio)), 160.0))
+    } else {
+        return CGSize(width: maxWidth, height: 64.0)
+    }
+}
+
+private func ayuGramDeletedMediaPreviewShouldDisplay(_ attribute: AyuGramDeletedMessageAttribute) -> Bool {
+    return attribute.mediaKind != nil
+        || attribute.mediaMimeType != nil
+        || attribute.mediaFileName != nil
+        || attribute.mediaPreviewPath != nil
+}
+
+private func ayuGramDeletedMediaPreviewPlaceholderImage(
+    size: CGSize,
+    backgroundColor: UIColor,
+    foregroundColor: UIColor
+) -> UIImage? {
+    return generateImage(size, rotatedContext: { size, context in
+        context.setFillColor(backgroundColor.cgColor)
+        context.fill(CGRect(origin: CGPoint(), size: size))
+
+        let iconSize = CGSize(width: 34.0, height: 42.0)
+        let iconRect = CGRect(
+            x: floor((size.width - iconSize.width) / 2.0),
+            y: floor((size.height - iconSize.height) / 2.0),
+            width: iconSize.width,
+            height: iconSize.height
+        )
+        let path = UIBezierPath(roundedRect: iconRect, cornerRadius: 4.0)
+        context.setStrokeColor(foregroundColor.withAlphaComponent(0.65).cgColor)
+        context.setLineWidth(2.0)
+        context.addPath(path.cgPath)
+        context.strokePath()
+
+        let foldPath = UIBezierPath()
+        foldPath.move(to: CGPoint(x: iconRect.maxX - 10.0, y: iconRect.minY))
+        foldPath.addLine(to: CGPoint(x: iconRect.maxX - 10.0, y: iconRect.minY + 10.0))
+        foldPath.addLine(to: CGPoint(x: iconRect.maxX, y: iconRect.minY + 10.0))
+        context.addPath(foldPath.cgPath)
+        context.strokePath()
+
+        let lineColor = foregroundColor.withAlphaComponent(0.45).cgColor
+        context.setStrokeColor(lineColor)
+        context.setLineWidth(1.5)
+        for i in 0 ..< 3 {
+            let y = iconRect.minY + 19.0 + CGFloat(i) * 7.0
+            context.move(to: CGPoint(x: iconRect.minX + 7.0, y: y))
+            context.addLine(to: CGPoint(x: iconRect.maxX - 7.0, y: y))
+            context.strokePath()
+        }
+    })
+}
+
+private func ayuGramDeletedMediaPreviewImage(
+    attribute: AyuGramDeletedMessageAttribute,
+    size: CGSize,
+    backgroundColor: UIColor,
+    foregroundColor: UIColor
+) -> UIImage? {
+    let shouldAttemptImageDecode = attribute.mediaPreviewResourceRole == "thumbnail"
+        || attribute.mediaKind == "image"
+        || attribute.mediaKind == "liveImage"
+        || attribute.mediaKind == "imageFile"
+    if shouldAttemptImageDecode, let path = attribute.mediaPreviewPath, let image = UIImage(contentsOfFile: path) {
+        return image
+    }
+    return ayuGramDeletedMediaPreviewPlaceholderImage(
+        size: size,
+        backgroundColor: backgroundColor,
+        foregroundColor: foregroundColor
+    )
+}
+
 private func findQuoteRange(string: String, quoteText: String, offset: Int?) -> NSRange? {
     let nsString = string as NSString
     var currentRange: NSRange?
@@ -87,6 +192,7 @@ public class ChatMessageTextBubbleContentNode: ChatMessageBubbleContentNode {
     
     private let containerNode: ContainerNode
     private let textNode: InteractiveTextNodeWithEntities
+    private var ayuGramDeletedMediaPreviewNode: ASImageNode?
     
     private let textAccessibilityOverlayNode: TextAccessibilityOverlayNode
     public var statusNode: ChatMessageDateAndStatusNode?
@@ -554,7 +660,10 @@ public class ChatMessageTextBubbleContentNode: ChatMessageBubbleContentNode {
                 
                 
                 let messageTheme = incoming ? item.presentationData.theme.theme.chat.message.incoming : item.presentationData.theme.theme.chat.message.outgoing
-                
+                let ayuGramDeletedPreviewAttribute = ayuGramDeletedMessageAttribute(item.message).flatMap { attribute -> AyuGramDeletedMessageAttribute? in
+                    return ayuGramDeletedMediaPreviewShouldDisplay(attribute) ? attribute : nil
+                }
+
                 let textFont = item.presentationData.messageFont
                 
                 var codeHighlightSpecs: [CachedMessageSyntaxHighlight.Spec] = []
@@ -786,10 +895,29 @@ public class ChatMessageTextBubbleContentNode: ChatMessageBubbleContentNode {
                 }
                 
                 var textFrame = CGRect(origin: CGPoint(x: -textInsets.left, y: -textInsets.top), size: textLayout.size)
-                
+
                 var textFrameWithoutInsets = CGRect(origin: CGPoint(x: textFrame.origin.x + textInsets.left, y: textFrame.origin.y + textInsets.top), size: CGSize(width: textFrame.width - textInsets.left - textInsets.right, height: textFrame.height - textInsets.top - textInsets.bottom))
-                
+
                 textFrame = textFrame.offsetBy(dx: layoutConstants.text.bubbleInsets.left, dy: topInset)
+
+                let ayuGramDeletedPreviewLayout: AyuGramDeletedMediaPreviewLayout?
+                let ayuGramDeletedPreviewHeight: CGFloat
+                if let ayuGramDeletedPreviewAttribute {
+                    let previewSize = ayuGramDeletedMediaPreviewSize(attribute: ayuGramDeletedPreviewAttribute, constrainedWidth: textConstrainedSize.width)
+                    ayuGramDeletedPreviewLayout = AyuGramDeletedMediaPreviewLayout(
+                        attribute: ayuGramDeletedPreviewAttribute,
+                        frame: CGRect(
+                            origin: CGPoint(x: layoutConstants.text.bubbleInsets.left, y: topInset),
+                            size: previewSize
+                        )
+                    )
+                    ayuGramDeletedPreviewHeight = previewSize.height + 6.0
+                    textFrame = textFrame.offsetBy(dx: 0.0, dy: ayuGramDeletedPreviewHeight)
+                } else {
+                    ayuGramDeletedPreviewLayout = nil
+                    ayuGramDeletedPreviewHeight = 0.0
+                }
+
                 let realTextFrame = textFrame
                 
                 if let clippedGlyphCountLayout {
@@ -797,9 +925,12 @@ public class ChatMessageTextBubbleContentNode: ChatMessageBubbleContentNode {
                     textFrameWithoutInsets.size = CGSize(width: textFrame.width - textInsets.left - textInsets.right, height: textFrame.height - textInsets.top - textInsets.bottom)
                 }
                 
-                textFrameWithoutInsets = textFrameWithoutInsets.offsetBy(dx: layoutConstants.text.bubbleInsets.left, dy: topInset)
-                
+                textFrameWithoutInsets = textFrameWithoutInsets.offsetBy(dx: layoutConstants.text.bubbleInsets.left, dy: topInset + ayuGramDeletedPreviewHeight)
+
                 var suggestedBoundingWidth: CGFloat = textFrameWithoutInsets.width
+                if let ayuGramDeletedPreviewLayout {
+                    suggestedBoundingWidth = max(suggestedBoundingWidth, ayuGramDeletedPreviewLayout.frame.width)
+                }
                 if let statusSuggestedWidthAndContinue = statusSuggestedWidthAndContinue, !hasDraft {
                     suggestedBoundingWidth = max(suggestedBoundingWidth, statusSuggestedWidthAndContinue.0)
                 }
@@ -812,6 +943,9 @@ public class ChatMessageTextBubbleContentNode: ChatMessageBubbleContentNode {
                     let statusSizeAndApply = statusSuggestedWidthAndContinue?.1(boundingWidth - sideInsets)
                     
                     boundingSize = textFrameWithoutInsets.size
+                    if ayuGramDeletedPreviewLayout != nil {
+                        boundingSize.height += ayuGramDeletedPreviewHeight
+                    }
                     if let statusSizeAndApply = statusSizeAndApply, !hasDraft {
                         boundingSize.height += statusSizeAndApply.0.height
                     }
@@ -834,6 +968,30 @@ public class ChatMessageTextBubbleContentNode: ChatMessageBubbleContentNode {
                             
                             strongSelf.textNode.textNode.displaysAsynchronously = !item.presentationData.isPreview
                             animation.animator.updateFrame(layer: strongSelf.containerNode.layer, frame: CGRect(origin: CGPoint(), size: boundingSize), completion: nil)
+
+                            if let ayuGramDeletedPreviewLayout {
+                                let previewNode: ASImageNode
+                                if let current = strongSelf.ayuGramDeletedMediaPreviewNode {
+                                    previewNode = current
+                                } else {
+                                    previewNode = ASImageNode()
+                                    previewNode.contentMode = .scaleAspectFill
+                                    previewNode.clipsToBounds = true
+                                    previewNode.cornerRadius = 8.0
+                                    strongSelf.ayuGramDeletedMediaPreviewNode = previewNode
+                                    strongSelf.containerNode.insertSubnode(previewNode, belowSubnode: strongSelf.textNode.textNode)
+                                }
+                                previewNode.image = ayuGramDeletedMediaPreviewImage(
+                                    attribute: ayuGramDeletedPreviewLayout.attribute,
+                                    size: ayuGramDeletedPreviewLayout.frame.size,
+                                    backgroundColor: messageTheme.mediaPlaceholderColor.withAlphaComponent(0.35),
+                                    foregroundColor: messageTheme.secondaryTextColor
+                                )
+                                animation.animator.updateFrame(layer: previewNode.layer, frame: ayuGramDeletedPreviewLayout.frame, completion: nil)
+                            } else if let previewNode = strongSelf.ayuGramDeletedMediaPreviewNode {
+                                strongSelf.ayuGramDeletedMediaPreviewNode = nil
+                                previewNode.removeFromSupernode()
+                            }
                             
                             
                             if let formattedDateUpdatePeriod {

@@ -3846,6 +3846,12 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
         strongSelf.backgroundNode.setType(type: backgroundType, highlighted: false, graphics: graphics, maskMode: strongSelf.backgroundMaskMode, hasWallpaper: hasWallpaper, transition: legacyTransition, backgroundNode: presentationContext.backgroundNode)
         strongSelf.backgroundWallpaperNode.setType(type: backgroundType, theme: item.presentationData.theme, essentialGraphics: graphics, maskMode: strongSelf.backgroundMaskMode, backgroundNode: presentationContext.backgroundNode)
         strongSelf.shadowNode.setType(type: backgroundType, hasWallpaper: hasWallpaper, graphics: graphics)
+
+        let ayuGramDeletedBubbleAlpha: CGFloat = item.associatedData.ayuGramData.semiTransparentDeletedMessages && ayuGramMessageIsDeletedBubble(item.message) ? 0.55 : 1.0
+        animation.animator.updateAlpha(layer: strongSelf.backgroundNode.layer, alpha: ayuGramDeletedBubbleAlpha, completion: nil)
+        animation.animator.updateAlpha(layer: strongSelf.backgroundWallpaperNode.layer, alpha: ayuGramDeletedBubbleAlpha, completion: nil)
+        animation.animator.updateAlpha(layer: strongSelf.shadowNode.layer, alpha: ayuGramDeletedBubbleAlpha, completion: nil)
+        animation.animator.updateAlpha(layer: strongSelf.clippingNode.layer, alpha: ayuGramDeletedBubbleAlpha, completion: nil)
         
         strongSelf.backgroundType = backgroundType
         

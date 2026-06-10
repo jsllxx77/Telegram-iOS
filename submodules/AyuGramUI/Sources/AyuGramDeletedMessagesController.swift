@@ -96,6 +96,7 @@ private enum AyuGramDeletedMessagesControllerEntry: ItemListNodeEntry {
 
     func item(presentationData: ItemListPresentationData, arguments: Any) -> ListViewItem {
         let arguments = arguments as! AyuGramDeletedMessagesControllerArguments
+        let languageCode = presentationData.strings.baseLanguageCode
 
         switch self {
         case let .search(query):
@@ -105,7 +106,7 @@ private enum AyuGramDeletedMessagesControllerEntry: ItemListNodeEntry {
                 systemStyle: .glass,
                 title: NSAttributedString(),
                 text: query,
-                placeholder: "Search",
+                placeholder: ayuGramLocalized("Search", languageCode: languageCode),
                 type: .regular(capitalization: false, autocorrection: false),
                 returnKeyType: .search,
                 clearType: .always,
@@ -117,7 +118,7 @@ private enum AyuGramDeletedMessagesControllerEntry: ItemListNodeEntry {
             )
         case let .snapshot(index, snapshot):
             let policy = AyuGramStreamerModePolicy(isEnabled: arguments.context.isAyuGramStreamerModeEnabled)
-            let text = ayuGramHistorySnapshotText(snapshot, ordinal: index + 1, mode: .deleted, policy: policy)
+            let text = ayuGramHistorySnapshotText(snapshot, ordinal: index + 1, mode: .deleted, policy: policy, languageCode: languageCode)
             return ItemListTextItem(
                 presentationData: presentationData,
                 text: .plain(text),
@@ -127,7 +128,7 @@ private enum AyuGramDeletedMessagesControllerEntry: ItemListNodeEntry {
         case let .empty(text):
             return ItemListTextItem(
                 presentationData: presentationData,
-                text: .plain(text),
+                text: .plain(ayuGramLocalized(text, languageCode: languageCode)),
                 sectionId: self.section,
                 style: .blocks,
                 textAlignment: .center
@@ -213,6 +214,7 @@ public func ayuGramDeletedMessagesController(context: AccountContext, peerId: Pe
     )
     |> deliverOnMainQueue
     |> map { presentationData, store, searchQuery -> (ItemListControllerState, (ItemListNodeState, Any)) in
+        let languageCode = presentationData.strings.baseLanguageCode
         let allSnapshots: [AyuGramMessageSnapshot]
         let snapshots: [AyuGramMessageSnapshot]
         if let threadId = threadId {
@@ -241,10 +243,10 @@ public func ayuGramDeletedMessagesController(context: AccountContext, peerId: Pe
 
         let controllerState = ItemListControllerState(
             presentationData: ItemListPresentationData(presentationData),
-            title: .text("Deleted Messages"),
+            title: .text(ayuGramLocalized("Deleted Messages", languageCode: languageCode)),
             leftNavigationButton: nil,
             rightNavigationButton: ItemListNavigationButton(
-                content: .text("Clear"),
+                content: .text(ayuGramLocalized("Clear", languageCode: languageCode)),
                 style: .regular,
                 enabled: !allSnapshots.isEmpty,
                 action: {
@@ -254,8 +256,8 @@ public func ayuGramDeletedMessagesController(context: AccountContext, peerId: Pe
                     }
                     actionSheet.setItemGroups([
                         ActionSheetItemGroup(items: [
-                            ActionSheetTextItem(title: "Clear saved deleted-message history for this chat?"),
-                            ActionSheetButtonItem(title: "Clear", color: .destructive, action: {
+                            ActionSheetTextItem(title: ayuGramLocalized("Clear saved deleted-message history for this chat?", languageCode: languageCode)),
+                            ActionSheetButtonItem(title: ayuGramLocalized("Clear", languageCode: languageCode), color: .destructive, action: {
                                 dismissAction()
                                 arguments.clearHistory()
                             })

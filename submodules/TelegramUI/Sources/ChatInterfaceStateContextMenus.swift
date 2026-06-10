@@ -1555,7 +1555,8 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
             canAddFilter: ayuGramCanAddFilter,
             canShadowBan: ayuGramCanShadowBan,
             isShadowBanned: ayuSettings.shadowBanIds.contains(ayuGramShadowBanId),
-            isExtendedMenu: false
+            isExtendedMenu: false,
+            languageCode: chatPresentationInterfaceState.strings.baseLanguageCode
         ))
         if !ayuGramDescriptors.isEmpty {
             if !actions.isEmpty {
@@ -2484,7 +2485,7 @@ private func ayuGramContextMenuItem(
             f(.dismissWithoutContent)
             let filterText = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
             if filterText.isEmpty {
-                ayuGramDisplayContextMenuPlaceholder(controllerInteraction: controllerInteraction, text: "Select text before adding a filter.")
+                ayuGramDisplayContextMenuPlaceholder(context: context, controllerInteraction: controllerInteraction, text: "Select text before adding a filter.")
             } else {
                 controllerInteraction.navigationController()?.pushViewController(ayuGramFilterEditController(
                     context: context,
@@ -2494,16 +2495,18 @@ private func ayuGramContextMenuItem(
             }
         case .shadowBan:
             f(.dismissWithoutContent)
-            ayuGramDisplayContextMenuPlaceholder(controllerInteraction: controllerInteraction, text: "Shadow ban will be available after filter storage is implemented.")
+            ayuGramDisplayContextMenuPlaceholder(context: context, controllerInteraction: controllerInteraction, text: "Shadow ban will be available after filter storage is implemented.")
         }
     })
 }
 
 private func ayuGramDisplayContextMenuPlaceholder(
+    context: AccountContext,
     controllerInteraction: ChatControllerInteraction,
     text: String
 ) {
-    controllerInteraction.displayUndo(.info(title: nil, text: text, timeout: nil, customUndoText: nil))
+    let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+    controllerInteraction.displayUndo(.info(title: nil, text: ayuGramLocalized(text, languageCode: presentationData.strings.baseLanguageCode), timeout: nil, customUndoText: nil))
 }
 
 private func ayuGramConfirmHideMessageLocally(
@@ -2512,13 +2515,14 @@ private func ayuGramConfirmHideMessageLocally(
     controllerInteraction: ChatControllerInteraction
 ) {
     let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+    let languageCode = presentationData.strings.baseLanguageCode
     controllerInteraction.presentController(textAlertController(
         context: context,
-        title: "Hide Message Locally",
-        text: "Hide this message only for this local account?",
+        title: ayuGramLocalized("Hide Message Locally", languageCode: languageCode),
+        text: ayuGramLocalized("Hide this message only for this local account?", languageCode: languageCode),
         actions: [
             TextAlertAction(type: .genericAction, title: presentationData.strings.Common_Cancel, action: {}),
-            TextAlertAction(type: .destructiveAction, title: "Hide", action: {
+            TextAlertAction(type: .destructiveAction, title: ayuGramLocalized("Hide", languageCode: languageCode), action: {
                 let _ = context.engine.messages.deleteMessagesInteractively(messageIds: [message.id], type: .forLocalPeer).startStandalone()
             })
         ],

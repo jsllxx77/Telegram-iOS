@@ -54,6 +54,7 @@ public struct AyuGramMessageContextMenuInput {
     public let deletedMessagesVisibility: AyuContextMenuVisibility
     public let readUntilVisibility: AyuContextMenuVisibility
     public let shadowBanVisibility: AyuContextMenuVisibility
+    public let languageCode: String
 
     public init(
         settings: AyuGramSettings,
@@ -72,7 +73,8 @@ public struct AyuGramMessageContextMenuInput {
         editedHistoryVisibility: AyuContextMenuVisibility = .visible,
         deletedMessagesVisibility: AyuContextMenuVisibility = .visible,
         readUntilVisibility: AyuContextMenuVisibility = .visible,
-        shadowBanVisibility: AyuContextMenuVisibility = .visible
+        shadowBanVisibility: AyuContextMenuVisibility = .visible,
+        languageCode: String = "en"
     ) {
         self.settings = settings
         self.hasEditedHistory = hasEditedHistory
@@ -91,6 +93,7 @@ public struct AyuGramMessageContextMenuInput {
         self.deletedMessagesVisibility = deletedMessagesVisibility
         self.readUntilVisibility = readUntilVisibility
         self.shadowBanVisibility = shadowBanVisibility
+        self.languageCode = languageCode
     }
 }
 
@@ -99,11 +102,14 @@ public func ayuGramMessageContextMenuDescriptors(
 ) -> [AyuGramMessageContextMenuDescriptor] {
     var descriptors: [AyuGramMessageContextMenuDescriptor] = []
     let settings = input.settings
+    let localized: (String) -> String = { value in
+        return ayuGramLocalized(value, languageCode: input.languageCode)
+    }
 
     if input.hasEditedHistory && ayuGramShouldShowContextMenuItem(input.editedHistoryVisibility, isExtendedMenu: input.isExtendedMenu) {
         descriptors.append(AyuGramMessageContextMenuDescriptor(
             action: .viewEditedHistory,
-            title: "View Edit History",
+            title: localized("View Edit History"),
             iconName: "Chat/Context Menu/Edit"
         ))
     }
@@ -111,7 +117,7 @@ public func ayuGramMessageContextMenuDescriptors(
     if input.canViewDeletedMessages && settings.saveDeletedMessages && ayuGramShouldShowContextMenuItem(input.deletedMessagesVisibility, isExtendedMenu: input.isExtendedMenu) {
         descriptors.append(AyuGramMessageContextMenuDescriptor(
             action: .viewDeletedMessages,
-            title: "Deleted Messages",
+            title: localized("Deleted Messages"),
             iconName: "Chat/Context Menu/Delete"
         ))
     }
@@ -119,7 +125,7 @@ public func ayuGramMessageContextMenuDescriptors(
     if input.canViewMessageDetails && ayuGramShouldShowContextMenuItem(settings.showMessageDetailsInContextMenu, isExtendedMenu: input.isExtendedMenu) {
         descriptors.append(AyuGramMessageContextMenuDescriptor(
             action: .messageDetails,
-            title: "Message Details",
+            title: localized("Message Details"),
             iconName: "Chat/Context Menu/Info"
         ))
     }
@@ -127,7 +133,7 @@ public func ayuGramMessageContextMenuDescriptors(
     if input.canCreateMessageShot && settings.showMessageShot {
         descriptors.append(AyuGramMessageContextMenuDescriptor(
             action: .messageShot,
-            title: "Message Shot",
+            title: localized("Message Shot"),
             iconName: "Chat/Context Menu/Share"
         ))
     }
@@ -135,7 +141,7 @@ public func ayuGramMessageContextMenuDescriptors(
     if input.canViewUserMessages && ayuGramShouldShowContextMenuItem(settings.showUserMessagesInContextMenu, isExtendedMenu: input.isExtendedMenu) {
         descriptors.append(AyuGramMessageContextMenuDescriptor(
             action: .userMessages,
-            title: "User Messages",
+            title: localized("User Messages"),
             iconName: "Chat/Context Menu/User"
         ))
     }
@@ -143,7 +149,7 @@ public func ayuGramMessageContextMenuDescriptors(
     if input.canRepeatMessage && ayuGramShouldShowContextMenuItem(settings.showRepeatMessageInContextMenu, isExtendedMenu: input.isExtendedMenu) {
         descriptors.append(AyuGramMessageContextMenuDescriptor(
             action: .repeatMessage,
-            title: "Repeat Message",
+            title: localized("Repeat Message"),
             iconName: "Chat/Context Menu/Resend"
         ))
     }
@@ -151,7 +157,7 @@ public func ayuGramMessageContextMenuDescriptors(
     if input.canReadUntil && ayuGramShouldShowContextMenuItem(input.readUntilVisibility, isExtendedMenu: input.isExtendedMenu) {
         descriptors.append(AyuGramMessageContextMenuDescriptor(
             action: .readUntil,
-            title: "Read Until",
+            title: localized("Read Until"),
             iconName: "Chat/Context Menu/Read"
         ))
     }
@@ -159,7 +165,7 @@ public func ayuGramMessageContextMenuDescriptors(
     if input.canHideMessageLocally && ayuGramShouldShowContextMenuItem(settings.showHideMessageInContextMenu, isExtendedMenu: input.isExtendedMenu) {
         descriptors.append(AyuGramMessageContextMenuDescriptor(
             action: .hideMessageLocally,
-            title: "Hide Message Locally",
+            title: localized("Hide Message Locally"),
             iconName: "Chat/Context Menu/Clear",
             isDestructive: true
         ))
@@ -168,7 +174,7 @@ public func ayuGramMessageContextMenuDescriptors(
     if input.canAddFilter && settings.filtersEnabled && ayuGramShouldShowContextMenuItem(settings.showAddFilterInContextMenu, isExtendedMenu: input.isExtendedMenu) {
         descriptors.append(AyuGramMessageContextMenuDescriptor(
             action: .addFilter,
-            title: "Add Filter",
+            title: localized("Add Filter"),
             iconName: "Chat/Context Menu/AddToFolder"
         ))
     }
@@ -176,7 +182,7 @@ public func ayuGramMessageContextMenuDescriptors(
     if input.canShadowBan && settings.filtersEnabled && ayuGramShouldShowContextMenuItem(input.shadowBanVisibility, isExtendedMenu: input.isExtendedMenu) {
         descriptors.append(AyuGramMessageContextMenuDescriptor(
             action: .shadowBan(isShadowBanned: input.isShadowBanned),
-            title: input.isShadowBanned ? "Remove Shadow Ban" : "Shadow Ban",
+            title: input.isShadowBanned ? localized("Remove Shadow Ban") : localized("Shadow Ban"),
             iconName: input.isShadowBanned ? "Chat/Context Menu/Read" : "Chat/Context Menu/Restrict",
             isDestructive: !input.isShadowBanned,
             isPlaceholder: true

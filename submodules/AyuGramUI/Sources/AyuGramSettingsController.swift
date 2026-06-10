@@ -309,13 +309,16 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
 
     func item(presentationData: ItemListPresentationData, arguments: Any) -> ListViewItem {
         let arguments = arguments as! AyuGramSettingsControllerArguments
+        let localized: (String) -> String = { value in
+            return ayuGramLocalized(value, languageCode: presentationData.strings.baseLanguageCode)
+        }
         switch self {
         case .ghostModeHeader:
-            return ItemListSectionHeaderItem(presentationData: presentationData, text: "GHOST MODE", sectionId: self.section)
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: localized("GHOST MODE"), sectionId: self.section)
         case let .useGlobalGhostMode(value):
             return ayuGramSwitchItem(presentationData: presentationData, title: "Use Global Ghost Mode", value: value, section: self.section, arguments: arguments, keyPath: \.useGlobalGhostMode)
         case let .globalSendReadMessages(value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Send Read Messages", value: value, sectionId: self.section, style: .blocks, updated: { value in
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: localized("Send Read Messages"), value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.updateSettings { settings in
                     var settings = settings
                     settings.globalGhostSettings.sendReadMessages = value
@@ -324,14 +327,14 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             })
 
         case .messageHistoryHeader:
-            return ItemListSectionHeaderItem(presentationData: presentationData, text: "MESSAGE HISTORY", sectionId: self.section)
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: localized("MESSAGE HISTORY"), sectionId: self.section)
         case let .saveDeletedMessages(value):
             return ayuGramSwitchItem(presentationData: presentationData, title: "Save Deleted Messages", value: value, section: self.section, arguments: arguments, keyPath: \.saveDeletedMessages)
         case let .saveMessagesHistory(value):
             return ayuGramSwitchItem(presentationData: presentationData, title: "Save Message Edit History", value: value, section: self.section, arguments: arguments, keyPath: \.saveMessagesHistory)
 
         case .messageShotHeader:
-            return ItemListSectionHeaderItem(presentationData: presentationData, text: "MESSAGE SHOT", sectionId: self.section)
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: localized("MESSAGE SHOT"), sectionId: self.section)
         case let .showMessageShot(value):
             return ayuGramSwitchItem(presentationData: presentationData, title: "Show Message Shot", value: value, section: self.section, arguments: arguments, keyPath: \.showMessageShot)
         case let .messageShotShowBackground(value):
@@ -347,7 +350,7 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
         case let .messageShotRevealSpoilers(value):
             return ayuGramMessageShotSwitchItem(presentationData: presentationData, title: "Reveal Spoilers", value: value, section: self.section, arguments: arguments, keyPath: \.revealSpoilers)
         case let .messageShotEmbeddedTheme(value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Embedded Theme", value: value, sectionId: self.section, style: .blocks, updated: { value in
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: localized("Embedded Theme"), value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.updateSettings { settings in
                     var settings = settings
                     settings.messageShotSettings.embeddedThemeType = value ? 0 : -1
@@ -356,22 +359,22 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             })
 
         case .filtersHeader:
-            return ItemListSectionHeaderItem(presentationData: presentationData, text: "FILTERS", sectionId: self.section)
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: localized("FILTERS"), sectionId: self.section)
         case let .filtersEnabled(value):
             return ayuGramSwitchItem(presentationData: presentationData, title: "Enable Filters", value: value, section: self.section, arguments: arguments, keyPath: \.filtersEnabled)
         case let .filtersEnabledInChats(value):
             return ayuGramSwitchItem(presentationData: presentationData, title: "Apply Filters in Chats", value: value, section: self.section, arguments: arguments, keyPath: \.filtersEnabledInChats)
         case .filtersList:
-            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "Filters", label: "", sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: localized("Filters"), label: "", sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                 arguments.openFilters()
             })
 
         case .appearanceHeader:
-            return ItemListSectionHeaderItem(presentationData: presentationData, text: "APPEARANCE", sectionId: self.section)
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: localized("APPEARANCE"), sectionId: self.section)
         case let .semiTransparentDeletedMessages(value):
             return ayuGramSwitchItem(presentationData: presentationData, title: "Semi-Transparent Deleted Messages", value: value, section: self.section, arguments: arguments, keyPath: \.semiTransparentDeletedMessages)
         case let .messageBubbleRadius(value):
-            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "Message Bubble Radius", label: "\(value)", sectionId: self.section, style: .blocks, disclosureStyle: .none, action: {
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: localized("Message Bubble Radius"), label: "\(value)", sectionId: self.section, style: .blocks, disclosureStyle: .none, action: {
                 arguments.updateSettings { settings in
                     var settings = settings
                     settings.messageBubbleRadius = nextValue(settings.messageBubbleRadius, values: [0, 4, 8, 12, 15, 16, 20, 24])
@@ -379,7 +382,7 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
                 }
             })
         case let .avatarCorners(value):
-            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "Avatar Corners", label: "\(value)", sectionId: self.section, style: .blocks, disclosureStyle: .none, action: {
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: localized("Avatar Corners"), label: "\(value)", sectionId: self.section, style: .blocks, disclosureStyle: .none, action: {
                 arguments.updateSettings { settings in
                     var settings = settings
                     settings.avatarCorners = nextValue(settings.avatarCorners, values: [0, 6, 12, 18, 23])
@@ -394,11 +397,11 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return ayuGramSwitchItem(presentationData: presentationData, title: "Bottom Info Icons", value: value, section: self.section, arguments: arguments, keyPath: \.replaceBottomInfoWithIcons)
 
         case .chatControlsHeader:
-            return ItemListSectionHeaderItem(presentationData: presentationData, text: "CHAT CONTROLS", sectionId: self.section)
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: localized("CHAT CONTROLS"), sectionId: self.section)
         case let .hideFastShare(value):
             return ayuGramSwitchItem(presentationData: presentationData, title: "Hide Fast Share", value: value, section: self.section, arguments: arguments, keyPath: \.hideFastShare)
         case let .showPeerId(value):
-            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "Show Peer ID", label: stringForPeerIdDisplay(value), sectionId: self.section, style: .blocks, disclosureStyle: .none, action: {
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: localized("Show Peer ID"), label: stringForPeerIdDisplay(value, languageCode: presentationData.strings.baseLanguageCode), sectionId: self.section, style: .blocks, disclosureStyle: .none, action: {
                 arguments.updateSettings { settings in
                     var settings = settings
                     settings.showPeerId = nextPeerIdDisplay(settings.showPeerId)
@@ -425,7 +428,7 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return ayuGramSwitchItem(presentationData: presentationData, title: "Hide All Chats Folder", value: value, section: self.section, arguments: arguments, keyPath: \.hideAllChatsFolder)
 
         case .composerHeader:
-            return ItemListSectionHeaderItem(presentationData: presentationData, text: "COMPOSER", sectionId: self.section)
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: localized("COMPOSER"), sectionId: self.section)
         case let .showAttachButtonInMessageField(value):
             return ayuGramSwitchItem(presentationData: presentationData, title: "Attach Button", value: value, section: self.section, arguments: arguments, keyPath: \.showAttachButtonInMessageField)
         case let .showCommandsButtonInMessageField(value):
@@ -446,7 +449,7 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return ayuGramSwitchItem(presentationData: presentationData, title: "Emoji Popup", value: value, section: self.section, arguments: arguments, keyPath: \.showEmojiPopup)
 
         case .drawerHeader:
-            return ItemListSectionHeaderItem(presentationData: presentationData, text: "DRAWER", sectionId: self.section)
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: localized("DRAWER"), sectionId: self.section)
         case let .showMyProfileInDrawer(value):
             return ayuGramSwitchItem(presentationData: presentationData, title: "My Profile", value: value, section: self.section, arguments: arguments, keyPath: \.showMyProfileInDrawer)
         case let .showBotsInDrawer(value):
@@ -477,14 +480,14 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return ayuGramSwitchItem(presentationData: presentationData, title: "Streamer Tray Toggle", value: value, section: self.section, arguments: arguments, keyPath: \.showStreamerToggleInTray)
 
         case .translationHeader:
-            return ItemListSectionHeaderItem(presentationData: presentationData, text: "TRANSLATION", sectionId: self.section)
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: localized("TRANSLATION"), sectionId: self.section)
         case let .translationProvider(value):
-            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "Translation Provider", label: stringForTranslationProvider(value), sectionId: self.section, style: .blocks, disclosureStyle: .none, action: {
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: localized("Translation Provider"), label: stringForTranslationProvider(value, languageCode: presentationData.strings.baseLanguageCode), sectionId: self.section, style: .blocks, disclosureStyle: .none, action: {
                 presentTranslationProviderSheet(presentationData: arguments.presentationData(), current: value, arguments: arguments)
             })
 
         case .webViewHeader:
-            return ItemListSectionHeaderItem(presentationData: presentationData, text: "WEB VIEW", sectionId: self.section)
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: localized("WEB VIEW"), sectionId: self.section)
         case let .spoofWebviewAsAndroid(value):
             return ayuGramSwitchItem(presentationData: presentationData, title: "Spoof as Android", value: value, section: self.section, arguments: arguments, keyPath: \.spoofWebviewAsAndroid)
         case let .increaseWebviewHeight(value):
@@ -493,7 +496,7 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return ayuGramSwitchItem(presentationData: presentationData, title: "Increase WebView Width", value: value, section: self.section, arguments: arguments, keyPath: \.increaseWebviewWidth)
 
         case .advancedHeader:
-            return ItemListSectionHeaderItem(presentationData: presentationData, text: "ADVANCED", sectionId: self.section)
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: localized("ADVANCED"), sectionId: self.section)
         case let .streamerModeEnabled(value):
             return ayuGramSwitchItem(presentationData: presentationData, title: "Streamer Mode", value: value, section: self.section, arguments: arguments, keyPath: \.streamerModeEnabled)
         case let .crashReporting(value):
@@ -510,7 +513,8 @@ private func ayuGramSwitchItem(
     arguments: AyuGramSettingsControllerArguments,
     keyPath: WritableKeyPath<AyuGramSettings, Bool>
 ) -> ListViewItem {
-    return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: title, value: value, sectionId: section, style: .blocks, updated: { value in
+    let localizedTitle = ayuGramLocalized(title, languageCode: presentationData.strings.baseLanguageCode)
+    return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: localizedTitle, value: value, sectionId: section, style: .blocks, updated: { value in
         arguments.updateSettings { settings in
             var settings = settings
             settings[keyPath: keyPath] = value
@@ -527,7 +531,8 @@ private func ayuGramMessageShotSwitchItem(
     arguments: AyuGramSettingsControllerArguments,
     keyPath: WritableKeyPath<AyuGramMessageShotSettings, Bool>
 ) -> ListViewItem {
-    return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: title, value: value, sectionId: section, style: .blocks, updated: { value in
+    let localizedTitle = ayuGramLocalized(title, languageCode: presentationData.strings.baseLanguageCode)
+    return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: localizedTitle, value: value, sectionId: section, style: .blocks, updated: { value in
         arguments.updateSettings { settings in
             var settings = settings
             settings.messageShotSettings[keyPath: keyPath] = value
@@ -629,10 +634,10 @@ private func ayuGramSettingsControllerEntries(settings: AyuGramSettings) -> [Ayu
     return entries
 }
 
-private func stringForPeerIdDisplay(_ value: AyuPeerIdDisplay) -> String {
+private func stringForPeerIdDisplay(_ value: AyuPeerIdDisplay, languageCode: String) -> String {
     switch value {
     case .hidden:
-        return "Hidden"
+        return ayuGramLocalized("Hidden", languageCode: languageCode)
     case .telegramApi:
         return "Telegram API"
     case .botApi:
@@ -661,7 +666,7 @@ private func nextValue(_ value: Int32, values: [Int32]) -> Int32 {
     return values[0]
 }
 
-private func stringForTranslationProvider(_ value: AyuTranslationProvider) -> String {
+private func stringForTranslationProvider(_ value: AyuTranslationProvider, languageCode: String) -> String {
     switch value {
     case .telegram:
         return "Telegram"
@@ -670,11 +675,15 @@ private func stringForTranslationProvider(_ value: AyuTranslationProvider) -> St
     case .yandex:
         return "Yandex"
     case .native:
-        return "Native"
+        return ayuGramLocalized("Native", languageCode: languageCode)
     }
 }
 
 private func presentTranslationProviderSheet(presentationData: PresentationData, current: AyuTranslationProvider, arguments: AyuGramSettingsControllerArguments) {
+    let languageCode = presentationData.strings.baseLanguageCode
+    let localized: (String) -> String = { value in
+        return ayuGramLocalized(value, languageCode: languageCode)
+    }
     let actionSheet = ActionSheetController(presentationData: presentationData)
     let dismissAction: () -> Void = { [weak actionSheet] in
         actionSheet?.dismissAnimated()
@@ -694,8 +703,8 @@ private func presentTranslationProviderSheet(presentationData: PresentationData,
             }
             warningSheet.setItemGroups([
                 ActionSheetItemGroup(items: [
-                    ActionSheetTextItem(title: "\(stringForTranslationProvider(provider)) translations send text to a third-party service. Telegram cannot protect that text once it leaves Telegram."),
-                    ActionSheetButtonItem(title: "Use \(stringForTranslationProvider(provider))", color: .accent, action: {
+                    ActionSheetTextItem(title: ayuGramIsChineseLanguage(languageCode) ? "\(stringForTranslationProvider(provider, languageCode: languageCode)) 翻译会把文本发送给第三方服务。文本离开 Telegram 后，Telegram 无法再保护这些内容。" : "\(stringForTranslationProvider(provider, languageCode: languageCode)) translations send text to a third-party service. Telegram cannot protect that text once it leaves Telegram."),
+                    ActionSheetButtonItem(title: ayuGramIsChineseLanguage(languageCode) ? "使用 \(stringForTranslationProvider(provider, languageCode: languageCode))" : "Use \(stringForTranslationProvider(provider, languageCode: languageCode))", color: .accent, action: {
                         dismissWarning()
                         apply()
                     })
@@ -715,7 +724,7 @@ private func presentTranslationProviderSheet(presentationData: PresentationData,
     let providers: [AyuTranslationProvider] = [.telegram, .google, .yandex, .native]
     actionSheet.setItemGroups([
         ActionSheetItemGroup(items: providers.map { provider in
-            ActionSheetButtonItem(title: current == provider ? "\(stringForTranslationProvider(provider)) (current)" : stringForTranslationProvider(provider), color: .accent, action: {
+            ActionSheetButtonItem(title: current == provider ? "\(stringForTranslationProvider(provider, languageCode: languageCode)) (\(localized("current")))" : stringForTranslationProvider(provider, languageCode: languageCode), color: .accent, action: {
                 dismissAction()
                 selectProvider(provider)
             })
@@ -754,7 +763,7 @@ public func ayuGramSettingsController(context: AccountContext) -> ViewController
 
         let controllerState = ItemListControllerState(
             presentationData: ItemListPresentationData(presentationData),
-            title: .text("AyuGram"),
+            title: .text(ayuGramLocalized("AyuGram", languageCode: presentationData.strings.baseLanguageCode)),
             leftNavigationButton: nil,
             rightNavigationButton: nil,
             backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back)

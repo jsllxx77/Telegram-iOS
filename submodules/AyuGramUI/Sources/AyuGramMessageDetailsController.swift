@@ -118,7 +118,6 @@ private func ayuGramMessageDetailsControllerEntries(
 
 public func ayuGramMessageDetailsController(context: AccountContext, message: Message) -> ViewController {
     let policy = AyuGramStreamerModePolicy(isEnabled: context.isAyuGramStreamerModeEnabled)
-    let details = ayuGramMessageDetailsData(message: message, policy: policy)
     let arguments = AyuGramMessageDetailsControllerArguments(copyValue: { value in
         UIPasteboard.general.string = value
     })
@@ -126,9 +125,11 @@ public func ayuGramMessageDetailsController(context: AccountContext, message: Me
     let signal = context.sharedContext.presentationData
     |> deliverOnMainQueue
     |> map { presentationData -> (ItemListControllerState, (ItemListNodeState, Any)) in
+        let languageCode = presentationData.strings.baseLanguageCode
+        let details = ayuGramMessageDetailsData(message: message, policy: policy, languageCode: languageCode)
         let controllerState = ItemListControllerState(
             presentationData: ItemListPresentationData(presentationData),
-            title: .text("Message Details"),
+            title: .text(ayuGramLocalized("Message Details", languageCode: languageCode)),
             leftNavigationButton: nil,
             rightNavigationButton: nil,
             backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back)
@@ -146,7 +147,10 @@ public func ayuGramMessageDetailsController(context: AccountContext, message: Me
     return ItemListController(context: context, state: signal)
 }
 
-private func ayuGramMessageDetailsData(message: Message, policy: AyuGramStreamerModePolicy) -> AyuGramMessageDetailsData {
+private func ayuGramMessageDetailsData(message: Message, policy: AyuGramStreamerModePolicy, languageCode: String) -> AyuGramMessageDetailsData {
+    let localized: (String) -> String = { value in
+        return ayuGramLocalized(value, languageCode: languageCode)
+    }
     let peerId = message.id.peerId.toInt64()
     let messageId = "\(message.id.namespace):\(message.id.id)"
     let authorId = message.author?.id.toInt64()
@@ -154,59 +158,59 @@ private func ayuGramMessageDetailsData(message: Message, policy: AyuGramStreamer
     let entityCount = ayuGramMessageDetailsEntityCount(message)
     let views = ayuGramMessageDetailsViewCount(message)
     let forwards = ayuGramMessageDetailsForwardCount(message)
-    let mediaSummary = ayuGramMessageDetailsMediaSummary(message)
+    let mediaSummary = ayuGramMessageDetailsMediaSummary(message, languageCode: languageCode)
     let hiddenValue = AyuGramStreamerRedaction.hiddenValue
 
     let displayPeerId = policy.isEnabled ? hiddenValue : "\(peerId)"
     let displayMessageId = policy.isEnabled ? hiddenValue : messageId
-    let displayAuthorId = policy.isEnabled ? hiddenValue : ayuGramOptionalInt64String(authorId)
-    let displayThreadId = policy.isEnabled ? hiddenValue : ayuGramOptionalInt64String(message.threadId)
+    let displayAuthorId = policy.isEnabled ? hiddenValue : ayuGramOptionalInt64String(authorId, languageCode: languageCode)
+    let displayThreadId = policy.isEnabled ? hiddenValue : ayuGramOptionalInt64String(message.threadId, languageCode: languageCode)
 
     var lines: [String] = []
-    lines.append("Peer ID: \(displayPeerId)")
-    lines.append("Message ID: \(displayMessageId)")
-    lines.append("Author ID: \(displayAuthorId)")
-    lines.append("Date: \(ayuGramHistoryDateString(message.timestamp))")
-    lines.append("Edit Date: \(editDate.map(ayuGramHistoryDateString) ?? "Unknown")")
-    lines.append("Views: \(views.map { "\($0)" } ?? "Unknown")")
-    lines.append("Forwards: \(forwards.map { "\($0)" } ?? "Unknown")")
-    lines.append("Entity Count: \(entityCount)")
-    lines.append("Media: \(mediaSummary)")
-    lines.append("Thread ID: \(displayThreadId)")
+    lines.append("\(localized("Peer ID")): \(displayPeerId)")
+    lines.append("\(localized("Message ID")): \(displayMessageId)")
+    lines.append("\(localized("Author ID")): \(displayAuthorId)")
+    lines.append("\(localized("Date")): \(ayuGramHistoryDateString(message.timestamp, languageCode: languageCode))")
+    lines.append("\(localized("Edit Date")): \(editDate.map { ayuGramHistoryDateString($0, languageCode: languageCode) } ?? localized("Unknown"))")
+    lines.append("\(localized("Views")): \(views.map { "\($0)" } ?? localized("Unknown"))")
+    lines.append("\(localized("Forwards")): \(forwards.map { "\($0)" } ?? localized("Unknown"))")
+    lines.append("\(localized("Entity Count")): \(entityCount)")
+    lines.append("\(localized("Media")): \(mediaSummary)")
+    lines.append("\(localized("Thread ID")): \(displayThreadId)")
 
     if let globallyUniqueId = message.globallyUniqueId {
         let displayGloballyUniqueId = policy.isEnabled ? hiddenValue : "\(globallyUniqueId)"
-        lines.append("Global Unique ID: \(displayGloballyUniqueId)")
+        lines.append("\(localized("Global Unique ID")): \(displayGloballyUniqueId)")
     }
     let displayStableId = policy.isEnabled ? hiddenValue : "\(message.stableId)"
-    lines.append("Stable ID: \(displayStableId)")
+    lines.append("\(localized("Stable ID")): \(displayStableId)")
     if let groupingKey = message.groupingKey {
         let displayGroupingKey = policy.isEnabled ? hiddenValue : "\(groupingKey)"
-        lines.append("Grouping Key: \(displayGroupingKey)")
+        lines.append("\(localized("Grouping Key")): \(displayGroupingKey)")
     }
     if let sourceMessageId = message.forwardInfo?.sourceMessageId {
         let displaySourceMessageId = policy.isEnabled ? hiddenValue : "\(sourceMessageId.namespace):\(sourceMessageId.id)"
         let displaySourcePeerId = policy.isEnabled ? hiddenValue : "\(sourceMessageId.peerId.toInt64())"
-        lines.append("Forward Source Message ID: \(displaySourceMessageId)")
-        lines.append("Forward Source Peer ID: \(displaySourcePeerId)")
+        lines.append("\(localized("Forward Source Message ID")): \(displaySourceMessageId)")
+        lines.append("\(localized("Forward Source Peer ID")): \(displaySourcePeerId)")
     }
     if let forwardDate = message.forwardInfo?.date {
-        lines.append("Forward Date: \(ayuGramHistoryDateString(forwardDate))")
+        lines.append("\(localized("Forward Date")): \(ayuGramHistoryDateString(forwardDate, languageCode: languageCode))")
     }
 
     var copyActions: [(String, String)] = []
-    copyActions.append(("Copy Peer ID", displayPeerId))
-    copyActions.append(("Copy Message ID", displayMessageId))
+    copyActions.append((localized("Copy Peer ID"), displayPeerId))
+    copyActions.append((localized("Copy Message ID"), displayMessageId))
     if let authorId = authorId {
-        copyActions.append(("Copy Author ID", policy.isEnabled ? hiddenValue : "\(authorId)"))
+        copyActions.append((localized("Copy Author ID"), policy.isEnabled ? hiddenValue : "\(authorId)"))
     }
     if let threadId = message.threadId {
-        copyActions.append(("Copy Thread ID", policy.isEnabled ? hiddenValue : "\(threadId)"))
+        copyActions.append((localized("Copy Thread ID"), policy.isEnabled ? hiddenValue : "\(threadId)"))
     }
     if !message.text.isEmpty {
-        copyActions.append(("Copy Message Text", AyuGramStreamerRedaction.messagePreview(message.text, policy: policy)))
+        copyActions.append((localized("Copy Message Text"), AyuGramStreamerRedaction.messagePreview(message.text, policy: policy)))
     }
-    copyActions.append(("Copy All Details", lines.joined(separator: "\n")))
+    copyActions.append((localized("Copy All Details"), lines.joined(separator: "\n")))
 
     return AyuGramMessageDetailsData(lines: lines, copyActions: copyActions)
 }
@@ -247,14 +251,14 @@ private func ayuGramMessageDetailsEntityCount(_ message: Message) -> Int {
     return 0
 }
 
-private func ayuGramMessageDetailsMediaSummary(_ message: Message) -> String {
+private func ayuGramMessageDetailsMediaSummary(_ message: Message, languageCode: String) -> String {
     if message.media.isEmpty {
-        return "None"
+        return ayuGramLocalized("None", languageCode: languageCode)
     }
 
     var values: [String] = []
     for media in message.media {
-        values.append(ayuGramMessageDetailsMediaType(media))
+        values.append(ayuGramLocalized(ayuGramMessageDetailsMediaType(media), languageCode: languageCode))
     }
     return values.joined(separator: ", ")
 }

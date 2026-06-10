@@ -90,10 +90,11 @@ private enum AyuGramEditedHistoryControllerEntry: ItemListNodeEntry {
 
     func item(presentationData: ItemListPresentationData, arguments: Any) -> ListViewItem {
         let arguments = arguments as! AyuGramEditedHistoryControllerArguments
+        let languageCode = presentationData.strings.baseLanguageCode
 
         switch self {
         case let .snapshot(index, snapshot):
-            let text = ayuGramHistorySnapshotText(snapshot, ordinal: index + 1, mode: .edited, policy: arguments.policy)
+            let text = ayuGramHistorySnapshotText(snapshot, ordinal: index + 1, mode: .edited, policy: arguments.policy, languageCode: languageCode)
             return ItemListTextItem(
                 presentationData: presentationData,
                 text: .plain(text),
@@ -103,7 +104,7 @@ private enum AyuGramEditedHistoryControllerEntry: ItemListNodeEntry {
         case .empty:
             return ItemListTextItem(
                 presentationData: presentationData,
-                text: .plain("No edited history saved for this message."),
+                text: .plain(ayuGramLocalized("No edited history saved for this message.", languageCode: languageCode)),
                 sectionId: self.section,
                 style: .blocks,
                 textAlignment: .center
@@ -142,6 +143,7 @@ public func ayuGramEditedHistoryController(context: AccountContext, messageId: M
     )
     |> deliverOnMainQueue
     |> map { presentationData, store -> (ItemListControllerState, (ItemListNodeState, Any)) in
+        let languageCode = presentationData.strings.baseLanguageCode
         let snapshots = store.listEditedSnapshots(
             accountPeerId: accountPeerId,
             peerId: peerId,
@@ -151,7 +153,7 @@ public func ayuGramEditedHistoryController(context: AccountContext, messageId: M
 
         let controllerState = ItemListControllerState(
             presentationData: ItemListPresentationData(presentationData),
-            title: .text("Edit History"),
+            title: .text(ayuGramLocalized("Edit History", languageCode: languageCode)),
             leftNavigationButton: nil,
             rightNavigationButton: nil,
             backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back)
@@ -174,7 +176,10 @@ enum AyuGramHistorySnapshotMode {
     case deleted
 }
 
-func ayuGramHistorySnapshotText(_ snapshot: AyuGramMessageSnapshot, ordinal: Int, mode: AyuGramHistorySnapshotMode, policy: AyuGramStreamerModePolicy = .disabled) -> String {
+func ayuGramHistorySnapshotText(_ snapshot: AyuGramMessageSnapshot, ordinal: Int, mode: AyuGramHistorySnapshotMode, policy: AyuGramStreamerModePolicy = .disabled, languageCode: String = "en") -> String {
+    let localized: (String) -> String = { value in
+        return ayuGramLocalized(value, languageCode: languageCode)
+    }
     var lines: [String] = []
     lines.append("#\(ordinal)")
 
@@ -183,60 +188,60 @@ func ayuGramHistorySnapshotText(_ snapshot: AyuGramMessageSnapshot, ordinal: Int
     } else if let mediaSummary = snapshot.mediaSummary, !mediaSummary.isEmpty {
         lines.append("[\(mediaSummary)]")
     } else {
-        lines.append("[No text]")
+        lines.append("[\(localized("No text"))]")
     }
 
     let hiddenValue = AyuGramStreamerRedaction.hiddenValue
-    let displayAuthorId = policy.isEnabled ? hiddenValue : ayuGramOptionalInt64String(snapshot.authorPeerId)
+    let displayAuthorId = policy.isEnabled ? hiddenValue : ayuGramOptionalInt64String(snapshot.authorPeerId, languageCode: languageCode)
     let displayMessageId = policy.isEnabled ? hiddenValue : "\(snapshot.messageNamespace):\(snapshot.messageId)"
-    lines.append("Author: \(displayAuthorId)")
-    lines.append("Message ID: \(displayMessageId)")
-    lines.append("Date: \(ayuGramHistoryDateString(snapshot.timestamp))")
+    lines.append("\(localized("Author")): \(displayAuthorId)")
+    lines.append("\(localized("Message ID")): \(displayMessageId)")
+    lines.append("\(localized("Date")): \(ayuGramHistoryDateString(snapshot.timestamp, languageCode: languageCode))")
 
     switch mode {
     case .edited:
         if let editTimestamp = snapshot.editTimestamp {
-            lines.append("Edit Date: \(ayuGramHistoryDateString(editTimestamp))")
+            lines.append("\(localized("Edit Date")): \(ayuGramHistoryDateString(editTimestamp, languageCode: languageCode))")
         } else {
-            lines.append("Edit Date: Unknown")
+            lines.append("\(localized("Edit Date")): \(localized("Unknown"))")
         }
     case .deleted:
         if let editTimestamp = snapshot.editTimestamp {
-            lines.append("Edit Date: \(ayuGramHistoryDateString(editTimestamp))")
+            lines.append("\(localized("Edit Date")): \(ayuGramHistoryDateString(editTimestamp, languageCode: languageCode))")
         } else {
-            lines.append("Edit Date: Unknown")
+            lines.append("\(localized("Edit Date")): \(localized("Unknown"))")
         }
-        lines.append("Captured: \(ayuGramHistoryDateString(snapshot.createdAt))")
+        lines.append("\(localized("Captured")): \(ayuGramHistoryDateString(snapshot.createdAt, languageCode: languageCode))")
     }
 
     if let stableId = snapshot.stableId {
         let displayStableId = policy.isEnabled ? hiddenValue : "\(stableId)"
-        lines.append("Stable ID: \(displayStableId)")
+        lines.append("\(localized("Stable ID")): \(displayStableId)")
     }
     if let threadId = snapshot.threadId {
         let displayThreadId = policy.isEnabled ? hiddenValue : "\(threadId)"
-        lines.append("Thread ID: \(displayThreadId)")
+        lines.append("\(localized("Thread ID")): \(displayThreadId)")
     }
     if let mediaSummary = snapshot.mediaSummary, !mediaSummary.isEmpty, !snapshot.text.isEmpty {
-        lines.append("Media: \(mediaSummary)")
+        lines.append("\(localized("Media")): \(mediaSummary)")
     }
 
     return lines.joined(separator: "\n")
 }
 
-func ayuGramHistoryDateString(_ timestamp: Int32) -> String {
+func ayuGramHistoryDateString(_ timestamp: Int32, languageCode: String = "en") -> String {
     let date = Date(timeIntervalSince1970: Double(timestamp))
     let formatter = DateFormatter()
-    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.locale = Locale(identifier: languageCode)
     formatter.dateStyle = .medium
     formatter.timeStyle = .medium
     return formatter.string(from: date)
 }
 
-func ayuGramOptionalInt64String(_ value: Int64?) -> String {
+func ayuGramOptionalInt64String(_ value: Int64?, languageCode: String = "en") -> String {
     if let value = value {
         return "\(value)"
     } else {
-        return "Unknown"
+        return ayuGramLocalized("Unknown", languageCode: languageCode)
     }
 }

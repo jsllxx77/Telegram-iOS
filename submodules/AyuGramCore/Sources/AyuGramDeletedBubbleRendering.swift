@@ -38,6 +38,41 @@ public func ayuGramDeletedBubbleDisplayText(
     return lines.joined(separator: "\n")
 }
 
+public enum AyuGramDeletedBubbleMediaPreviewResourceRole: String, Equatable {
+    case thumbnail
+    case primary
+}
+
+public struct AyuGramDeletedBubbleMediaPreviewResourceCandidate: Equatable {
+    public var id: String
+    public var role: AyuGramDeletedBubbleMediaPreviewResourceRole
+
+    public init(id: String, role: AyuGramDeletedBubbleMediaPreviewResourceRole) {
+        self.id = id
+        self.role = role
+    }
+}
+
+public func ayuGramDeletedBubbleMediaPreviewResourceCandidates(
+    _ snapshot: AyuGramMessageSnapshot
+) -> [AyuGramDeletedBubbleMediaPreviewResourceCandidate] {
+    var seenIds = Set<String>()
+    var candidates: [AyuGramDeletedBubbleMediaPreviewResourceCandidate] = []
+
+    func append(_ id: String?, role: AyuGramDeletedBubbleMediaPreviewResourceRole) {
+        guard let trimmedId = ayuGramNonEmptyTrimmedString(id), !seenIds.contains(trimmedId) else {
+            return
+        }
+        seenIds.insert(trimmedId)
+        candidates.append(AyuGramDeletedBubbleMediaPreviewResourceCandidate(id: trimmedId, role: role))
+    }
+
+    append(snapshot.mediaThumbnailResourceId, role: .thumbnail)
+    append(snapshot.mediaResourceId, role: .primary)
+
+    return candidates
+}
+
 private func ayuGramNonEmptyTrimmedString(_ value: String?) -> String? {
     guard let value = value else {
         return nil

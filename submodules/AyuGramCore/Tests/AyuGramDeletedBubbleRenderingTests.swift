@@ -44,11 +44,62 @@ final class AyuGramDeletedBubbleRenderingTests: XCTestCase {
         )
     }
 
+    func testMediaPreviewCandidatesPreferThumbnailBeforePrimaryResource() {
+        let snapshot = self.makeSnapshot(
+            messageId: 123,
+            stableId: 456,
+            text: "photo",
+            mediaKind: "image",
+            mediaResourceId: "primary-resource",
+            mediaThumbnailResourceId: "thumbnail-resource"
+        )
+
+        XCTAssertEqual(
+            ayuGramDeletedBubbleMediaPreviewResourceCandidates(snapshot),
+            [
+                AyuGramDeletedBubbleMediaPreviewResourceCandidate(id: "thumbnail-resource", role: .thumbnail),
+                AyuGramDeletedBubbleMediaPreviewResourceCandidate(id: "primary-resource", role: .primary)
+            ]
+        )
+    }
+
+    func testMediaPreviewCandidatesSkipDuplicateResourceIds() {
+        let snapshot = self.makeSnapshot(
+            messageId: 123,
+            stableId: 456,
+            text: "photo",
+            mediaKind: "image",
+            mediaResourceId: "same-resource",
+            mediaThumbnailResourceId: "same-resource"
+        )
+
+        XCTAssertEqual(
+            ayuGramDeletedBubbleMediaPreviewResourceCandidates(snapshot),
+            [AyuGramDeletedBubbleMediaPreviewResourceCandidate(id: "same-resource", role: .thumbnail)]
+        )
+    }
+
+    func testMediaPreviewCandidatesIgnoreBlankResourceIds() {
+        let snapshot = self.makeSnapshot(
+            messageId: 123,
+            stableId: 456,
+            text: "photo",
+            mediaKind: "image",
+            mediaResourceId: " ",
+            mediaThumbnailResourceId: ""
+        )
+
+        XCTAssertTrue(ayuGramDeletedBubbleMediaPreviewResourceCandidates(snapshot).isEmpty)
+    }
+
     private func makeSnapshot(
         messageId: Int32,
         stableId: Int64?,
         text: String,
-        mediaSummary: String? = nil
+        mediaSummary: String? = nil,
+        mediaKind: String? = nil,
+        mediaResourceId: String? = nil,
+        mediaThumbnailResourceId: String? = nil
     ) -> AyuGramMessageSnapshot {
         return AyuGramMessageSnapshot(
             accountPeerId: 1,
@@ -65,6 +116,9 @@ final class AyuGramDeletedBubbleRenderingTests: XCTestCase {
             views: nil,
             forwardInfoData: nil,
             mediaSummary: mediaSummary,
+            mediaKind: mediaKind,
+            mediaResourceId: mediaResourceId,
+            mediaThumbnailResourceId: mediaThumbnailResourceId,
             createdAt: 1001
         )
     }

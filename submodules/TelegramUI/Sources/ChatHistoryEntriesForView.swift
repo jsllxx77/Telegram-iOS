@@ -54,13 +54,40 @@ private func ayuGramDeletedBubbleFallbackMark(languageCode: String) -> String {
     return "Deleted"
 }
 
+private struct AyuGramDeletedBubbleCachedMediaPreview {
+    var resourceId: String
+    var resourceRole: String
+    var path: String
+}
+
+private func ayuGramDeletedBubbleCachedMediaPreview(
+    snapshot: AyuGramMessageSnapshot,
+    context: AccountContext
+) -> AyuGramDeletedBubbleCachedMediaPreview? {
+    for candidate in ayuGramDeletedBubbleMediaPreviewResourceCandidates(snapshot) {
+        if let path = context.engine.resources.completedResourcePath(
+            id: EngineMediaResource.Id(candidate.id),
+            pathExtension: nil
+        ) {
+            return AyuGramDeletedBubbleCachedMediaPreview(
+                resourceId: candidate.id,
+                resourceRole: candidate.role.rawValue,
+                path: path
+            )
+        }
+    }
+
+    return nil
+}
+
 private func ayuGramDeletedSnapshotMessage(
     snapshot: AyuGramMessageSnapshot,
     peerId: PeerId,
     accountPeerId: PeerId,
     presentationData: ChatPresentationData,
     peerLookup: [PeerId: Peer],
-    settings: AyuGramSettings
+    settings: AyuGramSettings,
+    cachedMediaPreview: AyuGramDeletedBubbleCachedMediaPreview?
 ) -> Message {
     let authorPeerId = snapshot.authorPeerId.map(PeerId.init)
     let author = authorPeerId.flatMap { peerLookup[$0] }
@@ -104,7 +131,15 @@ private func ayuGramDeletedSnapshotMessage(
             originalNamespace: snapshot.messageNamespace,
             originalId: snapshot.messageId,
             threadId: snapshot.threadId,
-            createdAt: snapshot.createdAt
+            createdAt: snapshot.createdAt,
+            mediaKind: snapshot.mediaKind,
+            mediaMimeType: snapshot.mediaMimeType,
+            mediaFileName: snapshot.mediaFileName,
+            mediaDuration: snapshot.mediaDuration,
+            mediaDimensions: snapshot.mediaDimensions,
+            mediaPreviewResourceId: cachedMediaPreview?.resourceId,
+            mediaPreviewResourceRole: cachedMediaPreview?.resourceRole,
+            mediaPreviewPath: cachedMediaPreview?.path
         )],
         media: [],
         peers: SimpleDictionary(peers),
@@ -486,7 +521,8 @@ func chatHistoryEntriesForView(
                 accountPeerId: accountPeerId,
                 presentationData: presentationData,
                 peerLookup: peerLookup,
-                settings: ayuGramSettings
+                settings: ayuGramSettings,
+                cachedMediaPreview: ayuGramDeletedBubbleCachedMediaPreview(snapshot: snapshot, context: context)
             )
             entries.append(.MessageEntry(message, presentationData, false, nil, .none, ChatMessageEntryAttributes(rank: nil, isContact: false, contentTypeHint: .generic, updatingMedia: nil, isPlaying: false, isCentered: false, authorStoryStats: nil, displayContinueThreadFooter: false, pinToTop: false)))
             hasAyuGramDeletedBubbleEntries = true

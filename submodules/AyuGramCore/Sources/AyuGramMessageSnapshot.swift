@@ -15,6 +15,13 @@ public struct AyuGramMessageSnapshot: Codable, Equatable {
     public var views: Int32?
     public var forwardInfoData: Data?
     public var mediaSummary: String?
+    public var mediaKind: String?
+    public var mediaResourceId: String?
+    public var mediaThumbnailResourceId: String?
+    public var mediaMimeType: String?
+    public var mediaFileName: String?
+    public var mediaDuration: Double?
+    public var mediaDimensions: String?
     public var createdAt: Int32
 
     private enum CodingKeys: String, CodingKey {
@@ -32,6 +39,13 @@ public struct AyuGramMessageSnapshot: Codable, Equatable {
         case views
         case forwardInfoData
         case mediaSummary
+        case mediaKind
+        case mediaResourceId
+        case mediaThumbnailResourceId
+        case mediaMimeType
+        case mediaFileName
+        case mediaDuration
+        case mediaDimensions
         case createdAt
     }
 
@@ -50,6 +64,13 @@ public struct AyuGramMessageSnapshot: Codable, Equatable {
         views: Int32?,
         forwardInfoData: Data?,
         mediaSummary: String?,
+        mediaKind: String? = nil,
+        mediaResourceId: String? = nil,
+        mediaThumbnailResourceId: String? = nil,
+        mediaMimeType: String? = nil,
+        mediaFileName: String? = nil,
+        mediaDuration: Double? = nil,
+        mediaDimensions: String? = nil,
         createdAt: Int32
     ) {
         self.accountPeerId = accountPeerId
@@ -66,6 +87,13 @@ public struct AyuGramMessageSnapshot: Codable, Equatable {
         self.views = views
         self.forwardInfoData = forwardInfoData
         self.mediaSummary = mediaSummary
+        self.mediaKind = mediaKind
+        self.mediaResourceId = mediaResourceId
+        self.mediaThumbnailResourceId = mediaThumbnailResourceId
+        self.mediaMimeType = mediaMimeType
+        self.mediaFileName = mediaFileName
+        self.mediaDuration = mediaDuration
+        self.mediaDimensions = mediaDimensions
         self.createdAt = createdAt
     }
 
@@ -107,6 +135,13 @@ public struct AyuGramMessageSnapshot: Codable, Equatable {
         self.views = try? container.decodeIfPresent(Int32.self, forKey: .views)
         self.forwardInfoData = try? container.decodeIfPresent(Data.self, forKey: .forwardInfoData)
         self.mediaSummary = try? container.decodeIfPresent(String.self, forKey: .mediaSummary)
+        self.mediaKind = try? container.decodeIfPresent(String.self, forKey: .mediaKind)
+        self.mediaResourceId = try? container.decodeIfPresent(String.self, forKey: .mediaResourceId)
+        self.mediaThumbnailResourceId = try? container.decodeIfPresent(String.self, forKey: .mediaThumbnailResourceId)
+        self.mediaMimeType = try? container.decodeIfPresent(String.self, forKey: .mediaMimeType)
+        self.mediaFileName = try? container.decodeIfPresent(String.self, forKey: .mediaFileName)
+        self.mediaDuration = try? container.decodeIfPresent(Double.self, forKey: .mediaDuration)
+        self.mediaDimensions = try? container.decodeIfPresent(String.self, forKey: .mediaDimensions)
         self.createdAt = container.decodeIfPresent(Int32.self, forKey: .createdAt, fallback: self.timestamp)
     }
 
@@ -127,6 +162,13 @@ public struct AyuGramMessageSnapshot: Codable, Equatable {
         try container.encodeIfPresent(self.views, forKey: .views)
         try container.encodeIfPresent(self.forwardInfoData, forKey: .forwardInfoData)
         try container.encodeIfPresent(self.mediaSummary, forKey: .mediaSummary)
+        try container.encodeIfPresent(self.mediaKind, forKey: .mediaKind)
+        try container.encodeIfPresent(self.mediaResourceId, forKey: .mediaResourceId)
+        try container.encodeIfPresent(self.mediaThumbnailResourceId, forKey: .mediaThumbnailResourceId)
+        try container.encodeIfPresent(self.mediaMimeType, forKey: .mediaMimeType)
+        try container.encodeIfPresent(self.mediaFileName, forKey: .mediaFileName)
+        try container.encodeIfPresent(self.mediaDuration, forKey: .mediaDuration)
+        try container.encodeIfPresent(self.mediaDimensions, forKey: .mediaDimensions)
         try container.encode(self.createdAt, forKey: .createdAt)
     }
 }

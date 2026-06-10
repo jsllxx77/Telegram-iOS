@@ -179,6 +179,13 @@ public struct AyuGramMessageHistoryStore: Codable, Equatable {
             && lhs.entitiesData == rhs.entitiesData
             && lhs.forwardInfoData == rhs.forwardInfoData
             && lhs.mediaSummary == rhs.mediaSummary
+            && lhs.mediaKind == rhs.mediaKind
+            && lhs.mediaResourceId == rhs.mediaResourceId
+            && lhs.mediaThumbnailResourceId == rhs.mediaThumbnailResourceId
+            && lhs.mediaMimeType == rhs.mediaMimeType
+            && lhs.mediaFileName == rhs.mediaFileName
+            && lhs.mediaDuration == rhs.mediaDuration
+            && lhs.mediaDimensions == rhs.mediaDimensions
     }
 
     public init(from decoder: Decoder) throws {
@@ -241,7 +248,28 @@ public struct AyuGramMessageHistoryStore: Codable, Equatable {
         if lhs.forwardInfoData != rhs.forwardInfoData {
             return Self.optionalDataSortKey(lhs.forwardInfoData) < Self.optionalDataSortKey(rhs.forwardInfoData)
         }
-        return Self.optionalStringSortKey(lhs.mediaSummary) < Self.optionalStringSortKey(rhs.mediaSummary)
+        if lhs.mediaSummary != rhs.mediaSummary {
+            return Self.optionalStringSortKey(lhs.mediaSummary) < Self.optionalStringSortKey(rhs.mediaSummary)
+        }
+        if lhs.mediaKind != rhs.mediaKind {
+            return Self.optionalStringSortKey(lhs.mediaKind) < Self.optionalStringSortKey(rhs.mediaKind)
+        }
+        if lhs.mediaResourceId != rhs.mediaResourceId {
+            return Self.optionalStringSortKey(lhs.mediaResourceId) < Self.optionalStringSortKey(rhs.mediaResourceId)
+        }
+        if lhs.mediaThumbnailResourceId != rhs.mediaThumbnailResourceId {
+            return Self.optionalStringSortKey(lhs.mediaThumbnailResourceId) < Self.optionalStringSortKey(rhs.mediaThumbnailResourceId)
+        }
+        if lhs.mediaMimeType != rhs.mediaMimeType {
+            return Self.optionalStringSortKey(lhs.mediaMimeType) < Self.optionalStringSortKey(rhs.mediaMimeType)
+        }
+        if lhs.mediaFileName != rhs.mediaFileName {
+            return Self.optionalStringSortKey(lhs.mediaFileName) < Self.optionalStringSortKey(rhs.mediaFileName)
+        }
+        if lhs.mediaDuration != rhs.mediaDuration {
+            return Self.isOptionalDoubleAscending(lhs.mediaDuration, rhs.mediaDuration)
+        }
+        return Self.optionalStringSortKey(lhs.mediaDimensions) < Self.optionalStringSortKey(rhs.mediaDimensions)
     }
 
     private static func areSnapshotsInDescendingHistoryOrder(
@@ -290,7 +318,28 @@ public struct AyuGramMessageHistoryStore: Codable, Equatable {
         if lhs.forwardInfoData != rhs.forwardInfoData {
             return Self.optionalDataSortKey(lhs.forwardInfoData) > Self.optionalDataSortKey(rhs.forwardInfoData)
         }
-        return Self.optionalStringSortKey(lhs.mediaSummary) > Self.optionalStringSortKey(rhs.mediaSummary)
+        if lhs.mediaSummary != rhs.mediaSummary {
+            return Self.optionalStringSortKey(lhs.mediaSummary) > Self.optionalStringSortKey(rhs.mediaSummary)
+        }
+        if lhs.mediaKind != rhs.mediaKind {
+            return Self.optionalStringSortKey(lhs.mediaKind) > Self.optionalStringSortKey(rhs.mediaKind)
+        }
+        if lhs.mediaResourceId != rhs.mediaResourceId {
+            return Self.optionalStringSortKey(lhs.mediaResourceId) > Self.optionalStringSortKey(rhs.mediaResourceId)
+        }
+        if lhs.mediaThumbnailResourceId != rhs.mediaThumbnailResourceId {
+            return Self.optionalStringSortKey(lhs.mediaThumbnailResourceId) > Self.optionalStringSortKey(rhs.mediaThumbnailResourceId)
+        }
+        if lhs.mediaMimeType != rhs.mediaMimeType {
+            return Self.optionalStringSortKey(lhs.mediaMimeType) > Self.optionalStringSortKey(rhs.mediaMimeType)
+        }
+        if lhs.mediaFileName != rhs.mediaFileName {
+            return Self.optionalStringSortKey(lhs.mediaFileName) > Self.optionalStringSortKey(rhs.mediaFileName)
+        }
+        if lhs.mediaDuration != rhs.mediaDuration {
+            return Self.isOptionalDoubleDescending(lhs.mediaDuration, rhs.mediaDuration)
+        }
+        return Self.optionalStringSortKey(lhs.mediaDimensions) > Self.optionalStringSortKey(rhs.mediaDimensions)
     }
 
     private static func optionalDataSortKey(_ data: Data?) -> String {
@@ -347,6 +396,32 @@ public struct AyuGramMessageHistoryStore: Codable, Equatable {
     }
 
     private static func isOptionalInt64Descending(_ lhs: Int64?, _ rhs: Int64?) -> Bool {
+        switch (lhs, rhs) {
+        case (nil, nil):
+            return false
+        case (nil, _?):
+            return false
+        case (_?, nil):
+            return true
+        case let (lhs?, rhs?):
+            return lhs > rhs
+        }
+    }
+
+    private static func isOptionalDoubleAscending(_ lhs: Double?, _ rhs: Double?) -> Bool {
+        switch (lhs, rhs) {
+        case (nil, nil):
+            return false
+        case (nil, _?):
+            return true
+        case (_?, nil):
+            return false
+        case let (lhs?, rhs?):
+            return lhs < rhs
+        }
+    }
+
+    private static func isOptionalDoubleDescending(_ lhs: Double?, _ rhs: Double?) -> Bool {
         switch (lhs, rhs) {
         case (nil, nil):
             return false

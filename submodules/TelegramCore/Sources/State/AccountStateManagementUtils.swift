@@ -3918,12 +3918,123 @@ private func ayuGramMediaSummary(from message: Message) -> String? {
         .joined(separator: ",")
 }
 
+private struct AyuGramMediaMetadata {
+    var kind: String?
+    var resourceId: String?
+    var thumbnailResourceId: String?
+    var mimeType: String?
+    var fileName: String?
+    var duration: Double?
+    var dimensions: String?
+}
+
+private func ayuGramPixelDimensionsString(_ dimensions: PixelDimensions) -> String {
+    return "\(dimensions.width)x\(dimensions.height)"
+}
+
+private func ayuGramMediaMetadata(from message: Message) -> AyuGramMediaMetadata? {
+    for media in message.media {
+        if let image = media as? TelegramMediaImage {
+            let largestRepresentation = largestImageRepresentation(image.representations)
+            let smallestRepresentation = smallestImageRepresentation(image.representations)
+
+            return AyuGramMediaMetadata(
+                kind: image.video != nil || !image.videoRepresentations.isEmpty ? "liveImage" : "image",
+                resourceId: largestRepresentation?.resource.id.stringRepresentation,
+                thumbnailResourceId: smallestRepresentation?.resource.id.stringRepresentation,
+                mimeType: "image/jpeg",
+                fileName: nil,
+                duration: nil,
+                dimensions: largestRepresentation.map { ayuGramPixelDimensionsString($0.dimensions) }
+            )
+        } else if let file = media as? TelegramMediaFile {
+            var fileName: String?
+            var imageDimensions: PixelDimensions?
+            var videoInfo: (duration: Double, size: PixelDimensions, isInstantRound: Bool)?
+            var audioInfo: (isVoice: Bool, duration: Int)?
+            var hasSticker = false
+            var hasCustomEmoji = false
+            var hasAnimated = false
+
+            for attribute in file.attributes {
+                switch attribute {
+                case let .FileName(value):
+                    fileName = value
+                case .Sticker(_, _, _):
+                    hasSticker = true
+                case .CustomEmoji(_, _, _, _):
+                    hasCustomEmoji = true
+                case let .ImageSize(size):
+                    imageDimensions = size
+                case .Animated:
+                    hasAnimated = true
+                case let .Video(duration, size, flags, _, _, _):
+                    videoInfo = (duration, size, flags.contains(.instantRoundVideo))
+                case let .Audio(isVoice, duration, _, _, _):
+                    audioInfo = (isVoice, duration)
+                case .HasLinkedStickers, .hintFileIsLarge, .hintIsValidated, .NoPremium:
+                    break
+                }
+            }
+
+            let kind: String
+            let duration: Double?
+            let dimensions: String?
+            if hasCustomEmoji {
+                kind = "customEmoji"
+                duration = nil
+                dimensions = imageDimensions.map(ayuGramPixelDimensionsString)
+            } else if hasSticker {
+                kind = "sticker"
+                duration = videoInfo?.duration
+                dimensions = (videoInfo?.size ?? imageDimensions).map(ayuGramPixelDimensionsString)
+            } else if let videoInfo = videoInfo {
+                kind = videoInfo.isInstantRound ? "roundVideo" : "video"
+                duration = videoInfo.duration
+                dimensions = ayuGramPixelDimensionsString(videoInfo.size)
+            } else if let audioInfo = audioInfo {
+                kind = audioInfo.isVoice ? "voice" : "audio"
+                duration = Double(audioInfo.duration)
+                dimensions = nil
+            } else if hasAnimated {
+                kind = "animated"
+                duration = nil
+                dimensions = imageDimensions.map(ayuGramPixelDimensionsString)
+            } else if file.mimeType.hasPrefix("image/") || imageDimensions != nil {
+                kind = "imageFile"
+                duration = nil
+                dimensions = imageDimensions.map(ayuGramPixelDimensionsString)
+            } else {
+                kind = "file"
+                duration = nil
+                dimensions = imageDimensions.map(ayuGramPixelDimensionsString)
+            }
+
+            let thumbnailResourceId = file.videoThumbnails.first?.resource.id.stringRepresentation
+                ?? smallestImageRepresentation(file.previewRepresentations)?.resource.id.stringRepresentation
+
+            return AyuGramMediaMetadata(
+                kind: kind,
+                resourceId: file.resource.id.stringRepresentation,
+                thumbnailResourceId: thumbnailResourceId,
+                mimeType: file.mimeType.isEmpty ? nil : file.mimeType,
+                fileName: fileName,
+                duration: duration,
+                dimensions: dimensions
+            )
+        }
+    }
+
+    return nil
+}
+
 private func ayuGramMessageSnapshot(
     accountPeerId: PeerId,
     message: Message,
     editTimestamp: Int32?
 ) -> AyuGramMessageSnapshot {
     let views = (message.attributes.first(where: { $0 is ViewCountMessageAttribute }) as? ViewCountMessageAttribute)?.count
+    let mediaMetadata = ayuGramMediaMetadata(from: message)
 
     return AyuGramMessageSnapshot(
         accountPeerId: accountPeerId.toInt64(),
@@ -3940,6 +4051,13 @@ private func ayuGramMessageSnapshot(
         views: views.map { Int32(clamping: $0) },
         forwardInfoData: nil,
         mediaSummary: ayuGramMediaSummary(from: message),
+        mediaKind: mediaMetadata?.kind,
+        mediaResourceId: mediaMetadata?.resourceId,
+        mediaThumbnailResourceId: mediaMetadata?.thumbnailResourceId,
+        mediaMimeType: mediaMetadata?.mimeType,
+        mediaFileName: mediaMetadata?.fileName,
+        mediaDuration: mediaMetadata?.duration,
+        mediaDimensions: mediaMetadata?.dimensions,
         createdAt: Int32(CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970)
     )
 }

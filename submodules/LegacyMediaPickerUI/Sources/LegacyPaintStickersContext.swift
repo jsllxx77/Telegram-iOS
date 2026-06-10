@@ -732,8 +732,14 @@ extension SolidRoundedButtonView: TGPhotoSolidRoundedButtonView {
         let _ = self.updateLayout(width: width, transition: .immediate)
     }
 }
-#else
+#elseif compiler(>=6.0)
 extension SolidRoundedButtonView: @retroactive TGPhotoSolidRoundedButtonView {
+    public func updateWidth(_ width: CGFloat) {
+        let _ = self.updateLayout(width: width, transition: .immediate)
+    }
+}
+#else
+extension SolidRoundedButtonView: TGPhotoSolidRoundedButtonView {
     public func updateWidth(_ width: CGFloat) {
         let _ = self.updateLayout(width: width, transition: .immediate)
     }

@@ -858,8 +858,18 @@ extension MediaEditorScreenImpl.Result: MediaEditorScreenResult {
         }
     }
 }
-#else
+#elseif compiler(>=6.0)
 extension MediaEditorScreenImpl.Result: @retroactive MediaEditorScreenResult {
+    public var target: Stories.PendingTarget {
+        if let sendAsPeerId = self.options.sendAsPeerId {
+            return .peer(sendAsPeerId)
+        } else {
+            return .myStories
+        }
+    }
+}
+#else
+extension MediaEditorScreenImpl.Result: MediaEditorScreenResult {
     public var target: Stories.PendingTarget {
         if let sendAsPeerId = self.options.sendAsPeerId {
             return .peer(sendAsPeerId)

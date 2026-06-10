@@ -27,8 +27,11 @@ import ComponentDisplayAdapters
 #if SWIFT_PACKAGE
 extension AudioWaveformNode: CustomMediaPlayerScrubbingForegroundNode {
 }
-#else
+#elseif compiler(>=6.0)
 extension AudioWaveformNode: @retroactive CustomMediaPlayerScrubbingForegroundNode {
+}
+#else
+extension AudioWaveformNode: CustomMediaPlayerScrubbingForegroundNode {
 }
 #endif
 

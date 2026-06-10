@@ -19,6 +19,17 @@ import ContactsPeerItem
 extension NavigationBarSearchContentNode: ItemListControllerSearchNavigationContentNode {
     public func activate() {
     }
+
+    public func deactivate() {
+    }
+
+    public func setQueryUpdated(_ f: @escaping (String) -> Void) {
+    }
+}
+#elseif compiler(>=6.0)
+extension NavigationBarSearchContentNode: @retroactive ItemListControllerSearchNavigationContentNode {
+    public func activate() {
+    }
     
     public func deactivate() {
     }
@@ -27,7 +38,7 @@ extension NavigationBarSearchContentNode: ItemListControllerSearchNavigationCont
     }
 }
 #else
-extension NavigationBarSearchContentNode: @retroactive ItemListControllerSearchNavigationContentNode {
+extension NavigationBarSearchContentNode: ItemListControllerSearchNavigationContentNode {
     public func activate() {
     }
     
@@ -439,4 +450,3 @@ private final class OldChannelsSearchItemNode: ItemListControllerSearchNode {
         return super.hitTest(point, with: event)
     }
 }
-

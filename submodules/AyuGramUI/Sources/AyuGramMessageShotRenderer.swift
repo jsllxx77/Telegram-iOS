@@ -167,7 +167,7 @@ public enum AyuGramMessageShotRenderer {
     }
 
     private static func reactionCount(message: Message) -> Int32 {
-        guard let attribute = message._asMessage().reactionsAttribute else {
+        guard let attribute = message.reactionsAttribute else {
             return 0
         }
         return attribute.reactions.reduce(0, { partialResult, reaction in

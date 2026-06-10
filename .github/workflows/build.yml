@@ -19,7 +19,17 @@ jobs:
       - name: Set active Xcode path
         run: |
           XCODE_VERSION=$(cat versions.json | python3 -c 'import json,sys;obj=json.load(sys.stdin);print(obj["xcode"]);')
-          sudo xcode-select -s /Applications/Xcode_$XCODE_VERSION.app/Contents/Developer
+          REQUESTED_XCODE_PATH="/Applications/Xcode_$XCODE_VERSION.app/Contents/Developer"
+          if [ -d "$REQUESTED_XCODE_PATH" ]; then
+            sudo xcode-select -s "$REQUESTED_XCODE_PATH"
+          else
+            echo "Requested Xcode path not found: $REQUESTED_XCODE_PATH"
+            echo "Using runner default Xcode:"
+            xcode-select -p
+            xcodebuild -version
+            echo "Available Xcode installations:"
+            ls -1 /Applications | grep "^Xcode" || true
+          fi
 
       - name: Create canonical source directory
         run: |
@@ -52,6 +62,7 @@ jobs:
           python3 build-system/Make/ImportCertificates.py --path build-system/fake-codesigning/certs
           python3 -u build-system/Make/Make.py \
             --bazelUserRoot="$BAZEL_USER_ROOT" \
+            --overrideXcodeVersion \
             build \
             --configurationPath="build-system/appstore-configuration.json" \
             --codesigningInformationPath=build-system/fake-codesigning \

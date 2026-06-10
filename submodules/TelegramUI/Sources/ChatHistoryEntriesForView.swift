@@ -47,6 +47,70 @@ private func ayuGramShouldHideChatHistoryMessage(
     )
 }
 
+private func ayuGramDeletedBubbleFallbackMark(languageCode: String) -> String {
+    if languageCode == "zh" || languageCode.hasPrefix("zh-") || languageCode.hasPrefix("zh_") {
+        return "已删除"
+    }
+    return "Deleted"
+}
+
+private func ayuGramDeletedSnapshotMessage(
+    snapshot: AyuGramMessageSnapshot,
+    peerId: PeerId,
+    accountPeerId: PeerId,
+    presentationData: ChatPresentationData,
+    peerLookup: [PeerId: Peer],
+    settings: AyuGramSettings
+) -> Message {
+    let authorPeerId = snapshot.authorPeerId.map(PeerId.init)
+    let author = authorPeerId.flatMap { peerLookup[$0] }
+    var peers: [PeerId: Peer] = [:]
+    if let authorPeerId, let author {
+        peers[authorPeerId] = author
+    }
+    if let peer = peerLookup[peerId] {
+        peers[peerId] = peer
+    }
+
+    let flags: MessageFlags
+    if authorPeerId == accountPeerId {
+        flags = []
+    } else {
+        flags = [.Incoming]
+    }
+
+    return Message(
+        stableId: ayuGramDeletedBubbleStableId(snapshot),
+        stableVersion: 0,
+        id: MessageId(peerId: peerId, namespace: Namespaces.Message.Local, id: ayuGramDeletedBubbleLocalMessageId(snapshot)),
+        globallyUniqueId: nil,
+        groupingKey: nil,
+        groupInfo: nil,
+        threadId: snapshot.threadId,
+        timestamp: snapshot.timestamp,
+        flags: flags,
+        tags: [],
+        globalTags: [],
+        localTags: [],
+        customTags: [],
+        forwardInfo: nil,
+        author: author,
+        text: ayuGramDeletedBubbleDisplayText(
+            snapshot: snapshot,
+            deletedMark: settings.deletedMark,
+            fallbackDeletedMark: ayuGramDeletedBubbleFallbackMark(languageCode: presentationData.strings.baseLanguageCode)
+        ),
+        attributes: [],
+        media: [],
+        peers: SimpleDictionary(peers),
+        associatedMessages: SimpleDictionary<MessageId, Message>(),
+        associatedMessageIds: [],
+        associatedMedia: [:],
+        associatedThreadInfo: nil,
+        associatedStories: [:]
+    )
+}
+
 func chatHistoryEntriesForView(
     currentState: ChatHistoryEntriesForViewState,
     context: AccountContext,
@@ -76,6 +140,7 @@ func chatHistoryEntriesForView(
     isMusicPlaylist: Bool,
     ayuGramSettings: AyuGramSettings,
     ayuGramFilterStore: AyuGramFilterStore,
+    ayuGramMessageHistoryStore: AyuGramMessageHistoryStore,
     pinToTopStableId: EngineMessage.StableId?
 ) -> ([ChatHistoryEntry], ChatHistoryEntriesForViewState) {
     var currentState = currentState
@@ -87,6 +152,7 @@ func chatHistoryEntriesForView(
     var adminRanks: [PeerId: CachedChannelAdminRank] = [:]
     var stickersEnabled = true
     var chatPeer: Peer?
+    var peerLookup: [PeerId: Peer] = [:]
     var cachedPeerDataPeers: [PeerId: Peer] = [:]
     if let peerId = location.peerId {
         for additionalEntry in view.additionalData {
@@ -98,6 +164,9 @@ func chatHistoryEntriesForView(
                 }
             } else if case let .peer(_, peer) = additionalEntry {
                 chatPeer = peer
+                if let peer {
+                    peerLookup[peer.id] = peer
+                }
                 if let channel = peer as? TelegramChannel, !channel.flags.contains(.isGigagroup) {
                     if let defaultBannedRights = channel.defaultBannedRights, defaultBannedRights.flags.contains(.banSendStickers) {
                         stickersEnabled = false
@@ -118,7 +187,21 @@ func chatHistoryEntriesForView(
                 }
             } else if case let .cachedPeerDataPeers(_, peers) = additionalEntry {
                 cachedPeerDataPeers = peers
+                for (peerId, peer) in peers {
+                    peerLookup[peerId] = peer
+                }
             }
+        }
+    }
+
+    var existingMessageIds = Set<MessageId>()
+    for entry in view.entries {
+        existingMessageIds.insert(entry.message.id)
+        if let author = entry.message.author {
+            peerLookup[author.id] = author
+        }
+        for (peerId, peer) in entry.message.peers {
+            peerLookup[peerId] = peer
         }
     }
     
@@ -158,6 +241,7 @@ func chatHistoryEntriesForView(
     
     var count = 0
     var hasVisibleHistoryEntries = false
+    var hasAyuGramDeletedBubbleEntries = false
     loop: for entry in view.entries {
         var message = entry.message
         var isRead = entry.isRead
@@ -361,6 +445,49 @@ func chatHistoryEntriesForView(
             }
         }
         entries = flatEntries
+    }
+
+    if ayuGramSettings.saveDeletedMessages, let peerId = location.peerId {
+        let accountPeerId = context.account.peerId
+        let accountPeerIdValue = accountPeerId.toInt64()
+        let peerIdValue = peerId.toInt64()
+        let deletedSnapshots: [AyuGramMessageSnapshot]
+        if let threadId = location.threadId {
+            deletedSnapshots = ayuGramMessageHistoryStore.listDeletedSnapshotsInThread(
+                accountPeerId: accountPeerIdValue,
+                peerId: peerIdValue,
+                threadId: threadId
+            )
+        } else {
+            deletedSnapshots = ayuGramMessageHistoryStore.listDeletedSnapshotsWithoutThread(
+                accountPeerId: accountPeerIdValue,
+                peerId: peerIdValue
+            )
+        }
+
+        for snapshot in deletedSnapshots {
+            let originalMessageId = MessageId(
+                peerId: peerId,
+                namespace: snapshot.messageNamespace,
+                id: snapshot.messageId
+            )
+            if existingMessageIds.contains(originalMessageId) {
+                continue
+            }
+
+            let message = ayuGramDeletedSnapshotMessage(
+                snapshot: snapshot,
+                peerId: peerId,
+                accountPeerId: accountPeerId,
+                presentationData: presentationData,
+                peerLookup: peerLookup,
+                settings: ayuGramSettings
+            )
+            entries.append(.MessageEntry(message, presentationData, false, nil, .none, ChatMessageEntryAttributes(rank: nil, isContact: false, contentTypeHint: .generic, updatingMedia: nil, isPlaying: false, isCentered: false, authorStoryStats: nil, displayContinueThreadFooter: false, pinToTop: false)))
+            hasAyuGramDeletedBubbleEntries = true
+        }
+
+        entries.sort()
     }
     
     var addBotForumHeader = false
@@ -698,6 +825,9 @@ func chatHistoryEntriesForView(
                     isEmpty = false
                 }
                 if addedThreadHead {
+                    isEmpty = false
+                }
+                if hasAyuGramDeletedBubbleEntries {
                     isEmpty = false
                 }
                 if isEmpty {

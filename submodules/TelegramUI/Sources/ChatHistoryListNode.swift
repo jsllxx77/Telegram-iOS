@@ -1885,9 +1885,17 @@ public final class ChatHistoryListNodeImpl: ListViewImpl, ChatHistoryNode, ChatH
         }
         |> distinctUntilChanged
 
-        let ayuGramFiltering = combineLatest(ayuGramSettingsSignal, ayuGramFilterStore)
+        let ayuGramMessageHistoryStore = context.engine.data.subscribe(
+            TelegramEngine.EngineData.Item.Configuration.ApplicationSpecificPreference(key: PreferencesKeys.ayuGramMessageHistoryStore())
+        )
+        |> map { entry -> AyuGramMessageHistoryStore in
+            return entry?.get(AyuGramMessageHistoryStore.self) ?? .empty
+        }
+        |> distinctUntilChanged
+
+        let ayuGramChatProjection = combineLatest(ayuGramSettingsSignal, ayuGramFilterStore, ayuGramMessageHistoryStore)
         |> distinctUntilChanged(isEqual: { lhs, rhs in
-            return lhs.0 == rhs.0 && lhs.1 == rhs.1
+            return lhs.0 == rhs.0 && lhs.1 == rhs.1 && lhs.2 == rhs.2
         })
         
         let promises = combineLatest(
@@ -1898,7 +1906,7 @@ public final class ChatHistoryListNodeImpl: ListViewImpl, ChatHistoryNode, ChatH
             self.scrollToMessageIdPromise.get(),
             self.chatHasBotsPromise.get(),
             self.allAdMessagesPromise.get(),
-            ayuGramFiltering
+            ayuGramChatProjection
         )
         
         let contentSettings = self.context.engine.data.subscribe(TelegramEngine.EngineData.Item.Configuration.ContentSettings())
@@ -2011,8 +2019,8 @@ public final class ChatHistoryListNodeImpl: ListViewImpl, ChatHistoryNode, ChatH
             deviceContactsNumbers |> debug_measureTimeToFirstEvent(label: "chatHistoryNode_deviceContactsNumbers"),
             contentSettings |> debug_measureTimeToFirstEvent(label: "chatHistoryNode_contentSettings")
         ) |> debug_measureTimeToFirstEvent(label: "chatHistoryNode_firstChatHistoryTransition")).startStrict(next: { [weak self] update, chatPresentationData, selectedMessages, updatingMedia, networkType, preferredStoryHighQuality, animatedEmojiStickers, additionalAnimatedEmojiStickers, customChannelDiscussionReadState, customThreadOutgoingReadState, availableReactions, availableMessageEffects, savedMessageTags, defaultReaction, accountPeer, accountCountry, suggestAudioTranscription, promises, topicAuthorId, translationState, maxReadStoryId, recommendedChannels, audioTranscriptionTrial, chatThemes, deviceContactsNumbers, contentSettings in
-            let (historyAppearsCleared, pendingUnpinnedAllMessages, pendingRemovedMessages, currentlyPlayingMessageIdAndType, scrollToMessageId, chatHasBots, allAdMessages, ayuGramFiltering) = promises
-            let (ayuGramSettings, ayuGramFilterStore) = ayuGramFiltering
+            let (historyAppearsCleared, pendingUnpinnedAllMessages, pendingRemovedMessages, currentlyPlayingMessageIdAndType, scrollToMessageId, chatHasBots, allAdMessages, ayuGramChatProjection) = promises
+            let (ayuGramSettings, ayuGramFilterStore, ayuGramMessageHistoryStore) = ayuGramChatProjection
             
             if measure_isFirstTime {
                 measure_isFirstTime = false
@@ -2325,6 +2333,7 @@ public final class ChatHistoryListNodeImpl: ListViewImpl, ChatHistoryNode, ChatH
                     isMusicPlaylist: isMusicPlaylist,
                     ayuGramSettings: ayuGramSettings,
                     ayuGramFilterStore: ayuGramFilterStore,
+                    ayuGramMessageHistoryStore: ayuGramMessageHistoryStore,
                     pinToTopStableId: pinToTopStableId
                 )
                 let lastHeaderId = filteredEntries.last.flatMap { listMessageDateHeaderId(timestamp: $0.index.timestamp) } ?? 0

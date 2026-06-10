@@ -23,6 +23,12 @@ public enum AyuTranslationProvider: String, Codable, Equatable {
     case native
 }
 
+public enum AyuLiquidGlassStyle: Int32, Codable, Equatable {
+    case system = 0
+    case clear = 1
+    case compatibility = 2
+}
+
 public enum AyuSendWithoutSoundOption: Int32, Codable, Equatable {
     case never = 0
     case inGhostMode = 1

@@ -20,3 +20,28 @@ public func updateAyuGramSettingsInteractively(accountManager: AccountManager<Te
         })
     }
 }
+
+public func updateAyuGramLiquidGlassStyleInteractively(accountManager: AccountManager<TelegramAccountManagerTypes>, style: AyuLiquidGlassStyle) -> Signal<Void, NoError> {
+    return accountManager.transaction { transaction -> Void in
+        transaction.updateSharedData(ApplicationSpecificSharedDataKeys.ayuGramSettings, { entry in
+            var currentSettings = entry?.get(AyuGramSettings.self) ?? AyuGramSettings.defaultSettings
+            currentSettings.liquidGlassStyle = style
+            return SharedPreferencesEntry(currentSettings)
+        })
+        transaction.updateSharedData(ApplicationSpecificSharedDataKeys.experimentalUISettings, { entry in
+            var currentSettings = entry?.get(ExperimentalUISettings.self) ?? ExperimentalUISettings.defaultSettings
+            switch style {
+            case .system:
+                currentSettings.fakeGlass = false
+                currentSettings.forceClearGlass = false
+            case .clear:
+                currentSettings.fakeGlass = false
+                currentSettings.forceClearGlass = true
+            case .compatibility:
+                currentSettings.fakeGlass = true
+                currentSettings.forceClearGlass = false
+            }
+            return SharedPreferencesEntry(currentSettings)
+        })
+    }
+}

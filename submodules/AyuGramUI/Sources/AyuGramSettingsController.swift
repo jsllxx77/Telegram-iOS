@@ -12,17 +12,20 @@ import TelegramUIPreferences
 
 private final class AyuGramSettingsControllerArguments {
     let updateSettings: (@escaping (AyuGramSettings) -> AyuGramSettings) -> Void
+    let updateLiquidGlassStyle: (AyuLiquidGlassStyle) -> Void
     let openFilters: () -> Void
     let presentationData: () -> PresentationData
     let presentController: (ViewController, Any?) -> Void
 
     init(
         updateSettings: @escaping (@escaping (AyuGramSettings) -> AyuGramSettings) -> Void,
+        updateLiquidGlassStyle: @escaping (AyuLiquidGlassStyle) -> Void,
         openFilters: @escaping () -> Void,
         presentationData: @escaping () -> PresentationData,
         presentController: @escaping (ViewController, Any?) -> Void
     ) {
         self.updateSettings = updateSettings
+        self.updateLiquidGlassStyle = updateLiquidGlassStyle
         self.openFilters = openFilters
         self.presentationData = presentationData
         self.presentController = presentController
@@ -69,6 +72,7 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
 
     case appearanceHeader
     case semiTransparentDeletedMessages(Bool)
+    case liquidGlassStyle(AyuLiquidGlassStyle)
     case messageBubbleRadius(Int32)
     case avatarCorners(Int32)
     case singleCornerRadius(Bool)
@@ -137,7 +141,7 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return AyuGramSettingsSection.messageShot.rawValue
         case .filtersHeader, .filtersEnabled, .filtersEnabledInChats, .filtersList:
             return AyuGramSettingsSection.filters.rawValue
-        case .appearanceHeader, .semiTransparentDeletedMessages, .messageBubbleRadius, .avatarCorners, .singleCornerRadius, .removeMessageTail, .replaceBottomInfoWithIcons:
+        case .appearanceHeader, .semiTransparentDeletedMessages, .liquidGlassStyle, .messageBubbleRadius, .avatarCorners, .singleCornerRadius, .removeMessageTail, .replaceBottomInfoWithIcons:
             return AyuGramSettingsSection.appearance.rawValue
         case .chatControlsHeader, .hideFastShare, .showPeerId, .showMessageSeconds, .hideSimilarChannels, .disableOpenLinkWarning, .disableAds, .disableStories, .hidePremiumStatuses, .hideNotificationCounters, .hideNotificationBadge, .hideAllChatsFolder:
             return AyuGramSettingsSection.chatControls.rawValue
@@ -198,7 +202,7 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return 300
         case .semiTransparentDeletedMessages:
             return 301
-        case .removeMessageTail:
+        case .liquidGlassStyle:
             return 302
         case .messageBubbleRadius:
             return 303
@@ -206,8 +210,10 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return 304
         case .singleCornerRadius:
             return 305
-        case .replaceBottomInfoWithIcons:
+        case .removeMessageTail:
             return 306
+        case .replaceBottomInfoWithIcons:
+            return 307
         case .chatControlsHeader:
             return 400
         case .hideFastShare:
@@ -373,6 +379,10 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return ItemListSectionHeaderItem(presentationData: presentationData, text: localized("APPEARANCE"), sectionId: self.section)
         case let .semiTransparentDeletedMessages(value):
             return ayuGramSwitchItem(presentationData: presentationData, title: "Semi-Transparent Deleted Messages", value: value, section: self.section, arguments: arguments, keyPath: \.semiTransparentDeletedMessages)
+        case let .liquidGlassStyle(value):
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: localized("Liquid Glass Style"), label: stringForLiquidGlassStyle(value, languageCode: presentationData.strings.baseLanguageCode), sectionId: self.section, style: .blocks, disclosureStyle: .none, action: {
+                arguments.updateLiquidGlassStyle(nextLiquidGlassStyle(value))
+            })
         case let .messageBubbleRadius(value):
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: localized("Message Bubble Radius"), label: "\(value)", sectionId: self.section, style: .blocks, disclosureStyle: .none, action: {
                 arguments.updateSettings { settings in
@@ -573,6 +583,7 @@ private func ayuGramSettingsControllerEntries(settings: AyuGramSettings) -> [Ayu
 
     entries.append(.appearanceHeader)
     entries.append(.semiTransparentDeletedMessages(settings.semiTransparentDeletedMessages))
+    entries.append(.liquidGlassStyle(settings.liquidGlassStyle))
     entries.append(.messageBubbleRadius(settings.messageBubbleRadius))
     entries.append(.avatarCorners(settings.avatarCorners))
     entries.append(.singleCornerRadius(settings.singleCornerRadius))
@@ -666,6 +677,28 @@ private func nextValue(_ value: Int32, values: [Int32]) -> Int32 {
     return values[0]
 }
 
+private func stringForLiquidGlassStyle(_ value: AyuLiquidGlassStyle, languageCode: String) -> String {
+    switch value {
+    case .system:
+        return ayuGramLocalized("System", languageCode: languageCode)
+    case .clear:
+        return ayuGramLocalized("Clear Glass", languageCode: languageCode)
+    case .compatibility:
+        return ayuGramLocalized("Compatibility Glass", languageCode: languageCode)
+    }
+}
+
+private func nextLiquidGlassStyle(_ value: AyuLiquidGlassStyle) -> AyuLiquidGlassStyle {
+    switch value {
+    case .system:
+        return .clear
+    case .clear:
+        return .compatibility
+    case .compatibility:
+        return .system
+    }
+}
+
 private func stringForTranslationProvider(_ value: AyuTranslationProvider, languageCode: String) -> String {
     switch value {
     case .telegram:
@@ -744,6 +777,8 @@ public func ayuGramSettingsController(context: AccountContext) -> ViewController
     let currentPresentationData = Atomic<PresentationData?>(value: nil)
     let arguments = AyuGramSettingsControllerArguments(updateSettings: { f in
         let _ = updateAyuGramSettingsInteractively(accountManager: context.sharedContext.accountManager, f).start()
+    }, updateLiquidGlassStyle: { style in
+        let _ = updateAyuGramLiquidGlassStyleInteractively(accountManager: context.sharedContext.accountManager, style: style).start()
     }, openFilters: {
         pushControllerImpl?(ayuGramFiltersController(context: context))
     }, presentationData: {

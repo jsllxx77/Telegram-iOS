@@ -224,6 +224,7 @@ public struct AyuGramSettings: Codable, Equatable {
     public var crashReporting: Bool
     public var avatarCorners: Int32
     public var singleCornerRadius: Bool
+    public var liquidGlassStyle: AyuLiquidGlassStyle
     public var useGlobalGhostMode: Bool
     public var globalGhostSettings: AyuGramGhostSettings
     public var ghostAccounts: [Int64: AyuGramGhostSettings]
@@ -317,6 +318,7 @@ public struct AyuGramSettings: Codable, Equatable {
         crashReporting: Bool = true,
         avatarCorners: Int32 = 23,
         singleCornerRadius: Bool = false,
+        liquidGlassStyle: AyuLiquidGlassStyle = .system,
         useGlobalGhostMode: Bool = true,
         globalGhostSettings: AyuGramGhostSettings = .defaultSettings,
         ghostAccounts: [Int64: AyuGramGhostSettings] = [:],
@@ -407,6 +409,7 @@ public struct AyuGramSettings: Codable, Equatable {
         self.crashReporting = crashReporting
         self.avatarCorners = avatarCorners
         self.singleCornerRadius = singleCornerRadius
+        self.liquidGlassStyle = liquidGlassStyle
         self.useGlobalGhostMode = useGlobalGhostMode
         self.globalGhostSettings = globalGhostSettings
         self.ghostAccounts = ghostAccounts
@@ -499,6 +502,7 @@ public struct AyuGramSettings: Codable, Equatable {
         case crashReporting
         case avatarCorners
         case singleCornerRadius
+        case liquidGlassStyle
         case useGlobalGhostMode
         case globalGhostSettings
         case ghostAccounts
@@ -594,6 +598,7 @@ public struct AyuGramSettings: Codable, Equatable {
         self.crashReporting = container.decodeIfPresent(Bool.self, forKey: .crashReporting, fallback: defaults.crashReporting)
         self.avatarCorners = container.decodeIfPresent(Int32.self, forKey: .avatarCorners, fallback: defaults.avatarCorners)
         self.singleCornerRadius = container.decodeIfPresent(Bool.self, forKey: .singleCornerRadius, fallback: defaults.singleCornerRadius)
+        self.liquidGlassStyle = container.decodeRawValueEnum(AyuLiquidGlassStyle.self, forKey: .liquidGlassStyle, fallback: defaults.liquidGlassStyle)
         self.useGlobalGhostMode = container.decodeIfPresent(Bool.self, forKey: .useGlobalGhostMode, fallback: defaults.useGlobalGhostMode)
         self.globalGhostSettings = container.decodeIfPresent(AyuGramGhostSettings.self, forKey: .globalGhostSettings, fallback: defaults.globalGhostSettings)
         if let ghostAccountEntries = try? container.decodeIfPresent([AyuGramGhostAccountSettingsEntry].self, forKey: .ghostAccounts) {
@@ -696,6 +701,7 @@ public struct AyuGramSettings: Codable, Equatable {
         try container.encode(self.crashReporting, forKey: .crashReporting)
         try container.encode(self.avatarCorners, forKey: .avatarCorners)
         try container.encode(self.singleCornerRadius, forKey: .singleCornerRadius)
+        try container.encode(self.liquidGlassStyle.rawValue, forKey: .liquidGlassStyle)
         try container.encode(self.useGlobalGhostMode, forKey: .useGlobalGhostMode)
         try container.encode(self.globalGhostSettings, forKey: .globalGhostSettings)
         let ghostAccountEntries = self.ghostAccounts.keys.sorted().map { accountId in

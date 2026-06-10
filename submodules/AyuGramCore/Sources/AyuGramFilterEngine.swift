@@ -3,11 +3,21 @@ import Foundation
 public struct AyuGramFilterMatchInput: Equatable {
     public var text: String
     public var dialogId: Int64?
+    public var authorPeerId: Int64?
+    public var isBlockedPeer: Bool
 
-    public init(text: String, dialogId: Int64? = nil) {
+    public init(text: String, dialogId: Int64? = nil, authorPeerId: Int64? = nil, isBlockedPeer: Bool = false) {
         self.text = text
         self.dialogId = dialogId
+        self.authorPeerId = authorPeerId
+        self.isBlockedPeer = isBlockedPeer
     }
+}
+
+public enum AyuGramFilterMatchReason: Equatable {
+    case filter(String)
+    case blockedPeer
+    case shadowBannedPeer
 }
 
 public func ayuGramFilterMatches(_ filter: AyuGramFilter, input: AyuGramFilterMatchInput) -> Bool {
@@ -57,14 +67,46 @@ public func ayuGramShouldHideMessage(store: AyuGramFilterStore, text: String, di
     return !ayuGramMatchingFilters(store: store, input: AyuGramFilterMatchInput(text: text, dialogId: dialogId)).isEmpty
 }
 
+public func ayuGramChatMessageFilterReason(
+    settings: AyuGramSettings,
+    store: AyuGramFilterStore,
+    input: AyuGramFilterMatchInput
+) -> AyuGramFilterMatchReason? {
+    guard settings.filtersEnabled && settings.filtersEnabledInChats else {
+        return nil
+    }
+
+    if settings.hideFromBlocked && input.isBlockedPeer {
+        return .blockedPeer
+    }
+
+    if let authorPeerId = input.authorPeerId, settings.shadowBanIds.contains(authorPeerId) {
+        return .shadowBannedPeer
+    }
+
+    if let filter = ayuGramMatchingFilters(store: store, input: input).first {
+        return .filter(filter.id)
+    }
+
+    return nil
+}
+
+public func ayuGramHasActiveChatFilters(settings: AyuGramSettings, store: AyuGramFilterStore) -> Bool {
+    guard settings.filtersEnabled && settings.filtersEnabledInChats else {
+        return false
+    }
+    return !store.filters.isEmpty || settings.hideFromBlocked || !settings.shadowBanIds.isEmpty
+}
+
 public func ayuGramShouldHideChatMessage(
     settings: AyuGramSettings,
     store: AyuGramFilterStore,
     text: String,
     dialogId: Int64?
 ) -> Bool {
-    guard settings.filtersEnabled && settings.filtersEnabledInChats else {
-        return false
-    }
-    return ayuGramShouldHideMessage(store: store, text: text, dialogId: dialogId)
+    return ayuGramChatMessageFilterReason(
+        settings: settings,
+        store: store,
+        input: AyuGramFilterMatchInput(text: text, dialogId: dialogId)
+    ) != nil
 }

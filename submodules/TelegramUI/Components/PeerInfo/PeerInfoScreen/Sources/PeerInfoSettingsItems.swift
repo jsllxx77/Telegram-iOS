@@ -13,6 +13,7 @@ import ItemListPeerItem
 import DeviceAccess
 import TelegramStringFormatting
 import PeerNameColorItem
+import AyuGramUI
 
 enum SettingsSection: Int, CaseIterable {
     case edit
@@ -38,6 +39,30 @@ func settingsItems(data: PeerInfoScreenData?, context: AccountContext, presentat
         items[section] = []
     }
     let ayuGramDrawerControls = context.ayuGramDrawerControls
+    let ayuGramLocalizedTitle: (String) -> String = { value in
+        return ayuGramLocalized(value, languageCode: presentationData.strings.baseLanguageCode)
+    }
+    let ayuGramToggleSendReadMessages: (Bool) -> Void = { value in
+        let _ = updateAyuGramSettingsInteractively(accountManager: context.sharedContext.accountManager, { settings in
+            var settings = settings
+            settings.useGlobalGhostMode = true
+            settings.globalGhostSettings.sendReadMessages = value
+            return settings
+        }).startStandalone()
+    }
+    let ayuGramToggleStreamerMode: (Bool) -> Void = { value in
+        let _ = updateAyuGramSettingsInteractively(accountManager: context.sharedContext.accountManager, { settings in
+            var settings = settings
+            settings.streamerModeEnabled = value
+            return settings
+        }).startStandalone()
+    }
+    let ayuGramToggleNightMode: (Bool) -> Void = { value in
+        let _ = updatePresentationThemeSettingsInteractively(accountManager: context.sharedContext.accountManager, { settings in
+            let targetTheme: PresentationThemeReference = value ? .builtin(.night) : .builtin(.day)
+            return settings.withUpdatedTheme(targetTheme)
+        }).startStandalone()
+    }
     
     let setPhotoTitle: String
     if let peer = data.peer, !peer.profileImageRepresentations.isEmpty {
@@ -208,6 +233,36 @@ func settingsItems(data: PeerInfoScreenData?, context: AccountContext, presentat
     if ayuGramDrawerControls.showCallsInDrawer {
         items[.shortcuts]!.append(PeerInfoScreenDisclosureItem(id: 2, text: presentationData.strings.CallSettings_RecentCalls, icon: PresentationResourcesSettings.recentCalls, action: {
             interaction.openSettings(.recentCalls)
+        }))
+    }
+    if ayuGramDrawerControls.showLReadToggleInDrawer {
+        items[.shortcuts]!.append(PeerInfoScreenDisclosureItem(id: 10, label: .text(ayuGramLocalizedTitle("Pending")), text: ayuGramLocalizedTitle("Local Read Toggle"), icon: PresentationResourcesSettings.security, action: {
+            interaction.openSettings(.ayuGram)
+        }))
+    }
+    if ayuGramDrawerControls.showSReadToggleInDrawer {
+        items[.shortcuts]!.append(PeerInfoScreenSwitchItem(id: 11, text: ayuGramLocalizedTitle("Server Read Toggle"), value: context.isAyuGramSendReadMessagesEnabled, icon: PresentationResourcesSettings.security, toggled: { value in
+            ayuGramToggleSendReadMessages(value)
+        }))
+    }
+    if ayuGramDrawerControls.showNightModeToggleInDrawer {
+        items[.shortcuts]!.append(PeerInfoScreenSwitchItem(id: 12, text: ayuGramLocalizedTitle("Night Mode Toggle"), value: presentationData.theme.overallDarkAppearance, icon: PresentationResourcesSettings.appearance, toggled: { value in
+            ayuGramToggleNightMode(value)
+        }))
+    }
+    if ayuGramDrawerControls.showGhostToggleInDrawer {
+        items[.shortcuts]!.append(PeerInfoScreenSwitchItem(id: 13, text: ayuGramLocalizedTitle("Ghost Toggle"), value: !context.isAyuGramSendReadMessagesEnabled, icon: PresentationResourcesSettings.security, toggled: { value in
+            ayuGramToggleSendReadMessages(!value)
+        }))
+    }
+    if ayuGramDrawerControls.showStreamerToggleInDrawer || ayuGramDrawerControls.showStreamerToggleInTray {
+        items[.shortcuts]!.append(PeerInfoScreenSwitchItem(id: 14, text: ayuGramLocalizedTitle("Streamer Toggle"), value: context.isAyuGramStreamerModeEnabled, icon: PresentationResourcesSettings.security, toggled: { value in
+            ayuGramToggleStreamerMode(value)
+        }))
+    }
+    if ayuGramDrawerControls.showGhostToggleInTray && !ayuGramDrawerControls.showGhostToggleInDrawer {
+        items[.shortcuts]!.append(PeerInfoScreenSwitchItem(id: 15, text: ayuGramLocalizedTitle("Ghost Tray Toggle"), value: !context.isAyuGramSendReadMessagesEnabled, icon: PresentationResourcesSettings.security, toggled: { value in
+            ayuGramToggleSendReadMessages(!value)
         }))
     }
     

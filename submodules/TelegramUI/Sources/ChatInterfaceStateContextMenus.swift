@@ -120,6 +120,54 @@ private func ayuGramDeletedBubbleContextMenuItems(
     return ContextController.Items(content: .list(actions))
 }
 
+private func ayuGramFilteredBubbleContextMenuItems(
+    chatPresentationInterfaceState: ChatPresentationInterfaceState,
+    context: AccountContext,
+    attribute: AyuGramFilteredMessageAttribute,
+    controllerInteraction: ChatControllerInteraction
+) -> ContextController.Items {
+    let languageCode = chatPresentationInterfaceState.strings.baseLanguageCode
+    let localized: (String) -> String = { value in
+        return ayuGramLocalized(value, languageCode: languageCode)
+    }
+    var actions: [ContextMenuItem] = []
+
+    if !attribute.originalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        actions.append(.action(ContextMenuActionItem(text: localized("Show Original Message"), icon: { theme in
+            return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Info"), color: theme.actionSheet.primaryTextColor)
+        }, action: { _, f in
+            f(.dismissWithoutContent)
+            controllerInteraction.presentController(textAlertController(
+                context: context,
+                title: localized("Filtered Message"),
+                text: attribute.originalText,
+                actions: [
+                    TextAlertAction(type: .defaultAction, title: chatPresentationInterfaceState.strings.Common_OK, action: {})
+                ]
+            ), nil)
+        })))
+
+        actions.append(.action(ContextMenuActionItem(text: localized("Copy Original Message"), icon: { theme in
+            return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Copy"), color: theme.actionSheet.primaryTextColor)
+        }, action: { _, f in
+            storeMessageTextInPasteboard(attribute.originalText, entities: nil)
+            Queue.mainQueue().after(0.2, {
+                controllerInteraction.displayUndo(.copy(text: chatPresentationInterfaceState.strings.Conversation_MessageCopied))
+            })
+            f(.default)
+        })))
+    }
+
+    actions.append(.action(ContextMenuActionItem(text: localized("AyuGram Filters"), icon: { theme in
+        return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/AddToFolder"), color: theme.actionSheet.primaryTextColor)
+    }, action: { _, f in
+        f(.dismissWithoutContent)
+        controllerInteraction.navigationController()?.pushViewController(ayuGramSettingsController(context: context))
+    })))
+
+    return ContextController.Items(content: .list(actions))
+}
+
 func canEditMessage(context: AccountContext, limitsConfiguration: EngineConfiguration.Limits, message: Message) -> Bool {
     return canEditMessage(accountPeerId: context.account.peerId, limitsConfiguration: limitsConfiguration, message: message)
 }
@@ -565,6 +613,14 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
                 chatPresentationInterfaceState: chatPresentationInterfaceState,
                 context: context,
                 message: message,
+                attribute: attribute,
+                controllerInteraction: controllerInteraction
+            ))
+        }
+        if messages.count == 1, let attribute = ayuGramFilteredMessageAttribute(message) {
+            return .single(ayuGramFilteredBubbleContextMenuItems(
+                chatPresentationInterfaceState: chatPresentationInterfaceState,
+                context: context,
                 attribute: attribute,
                 controllerInteraction: controllerInteraction
             ))
@@ -2571,9 +2627,26 @@ private func ayuGramContextMenuItem(
                     initialDialogId: message.id.peerId.toInt64()
                 ))
             }
-        case .shadowBan:
+        case let .shadowBan(isShadowBanned):
             f(.dismissWithoutContent)
-            ayuGramDisplayContextMenuPlaceholder(context: context, controllerInteraction: controllerInteraction, text: "Shadow ban will be available after filter storage is implemented.")
+            let shadowBanPeerId = (authorPeer?.id ?? message.id.peerId).toInt64()
+            let _ = updateAyuGramSettingsInteractively(accountManager: context.sharedContext.accountManager, { settings in
+                var settings = settings
+                if isShadowBanned {
+                    settings.shadowBanIds.remove(shadowBanPeerId)
+                } else {
+                    settings.filtersEnabled = true
+                    settings.filtersEnabledInChats = true
+                    settings.shadowBanIds.insert(shadowBanPeerId)
+                }
+                return settings
+            }).startStandalone(completed: {
+                ayuGramDisplayContextMenuPlaceholder(
+                    context: context,
+                    controllerInteraction: controllerInteraction,
+                    text: isShadowBanned ? "Shadow ban removed." : "Shadow ban enabled."
+                )
+            })
         }
     })
 }

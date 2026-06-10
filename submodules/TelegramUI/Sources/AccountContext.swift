@@ -29,6 +29,7 @@ import AyuGramCore
 private struct AyuGramContextDisplaySettings: Equatable {
     var hidePremiumStatuses: Bool
     var streamerModeEnabled: Bool
+    var sendReadMessagesEnabled: Bool
     var inputControls: AyuGramInputControls
     var drawerControls: AyuGramDrawerControls
     var webViewControls: AyuGramWebViewControls
@@ -183,6 +184,7 @@ public final class AccountContextImpl: AccountContext {
     private var ayuGramDisplaySettingsDisposable: Disposable?
     public private(set) var isAyuGramPremiumStatusHidden: Bool = false
     public private(set) var isAyuGramStreamerModeEnabled: Bool = false
+    public private(set) var isAyuGramSendReadMessagesEnabled: Bool = true
     public private(set) var ayuGramInputControls: AyuGramInputControls = .default
     public private(set) var ayuGramDrawerControls: AyuGramDrawerControls = .default
     public private(set) var ayuGramWebViewControls: AyuGramWebViewControls = .default
@@ -562,9 +564,12 @@ public final class AccountContextImpl: AccountContext {
         self.ayuGramDisplaySettingsDisposable = (sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.ayuGramSettings])
         |> map { sharedData -> AyuGramContextDisplaySettings in
             let settings = ayuGramSettings(sharedData: sharedData)
+            let accountId = account.peerId.id._internalGetInt64Value()
+            let ghostSettings = settings.useGlobalGhostMode ? settings.globalGhostSettings : (settings.ghostAccounts[accountId] ?? AyuGramGhostSettings.defaultSettings)
             return AyuGramContextDisplaySettings(
                 hidePremiumStatuses: settings.hidePremiumStatuses,
                 streamerModeEnabled: settings.streamerModeEnabled,
+                sendReadMessagesEnabled: ghostSettings.sendReadMessages && !ghostSettings.sendReadMessagesLocked,
                 inputControls: AyuGramInputControls(
                     showAttachButtonInMessageField: settings.showAttachButtonInMessageField,
                     showCommandsButtonInMessageField: settings.showCommandsButtonInMessageField,
@@ -603,6 +608,7 @@ public final class AccountContextImpl: AccountContext {
         |> deliverOnMainQueue).start(next: { [weak self] value in
             self?.isAyuGramPremiumStatusHidden = value.hidePremiumStatuses
             self?.isAyuGramStreamerModeEnabled = value.streamerModeEnabled
+            self?.isAyuGramSendReadMessagesEnabled = value.sendReadMessagesEnabled
             self?.ayuGramInputControls = value.inputControls
             self?.ayuGramDrawerControls = value.drawerControls
             self?.ayuGramWebViewControls = value.webViewControls

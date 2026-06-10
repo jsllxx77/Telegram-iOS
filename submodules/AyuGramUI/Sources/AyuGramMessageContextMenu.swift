@@ -179,13 +179,12 @@ public func ayuGramMessageContextMenuDescriptors(
         ))
     }
 
-    if input.canShadowBan && settings.filtersEnabled && ayuGramShouldShowContextMenuItem(input.shadowBanVisibility, isExtendedMenu: input.isExtendedMenu) {
+    if input.canShadowBan && ayuGramShouldShowContextMenuItem(input.shadowBanVisibility, isExtendedMenu: input.isExtendedMenu) {
         descriptors.append(AyuGramMessageContextMenuDescriptor(
             action: .shadowBan(isShadowBanned: input.isShadowBanned),
             title: input.isShadowBanned ? localized("Remove Shadow Ban") : localized("Shadow Ban"),
             iconName: input.isShadowBanned ? "Chat/Context Menu/Read" : "Chat/Context Menu/Restrict",
-            isDestructive: !input.isShadowBanned,
-            isPlaceholder: true
+            isDestructive: !input.isShadowBanned
         ))
     }
 

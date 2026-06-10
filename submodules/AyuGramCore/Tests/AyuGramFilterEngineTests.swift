@@ -76,4 +76,71 @@ final class AyuGramFilterEngineTests: XCTestCase {
 
         XCTAssertTrue(ayuGramShouldHideChatMessage(settings: settings, store: store, text: "", dialogId: nil))
     }
+
+    func testBlockedPeerReasonRequiresSetting() {
+        let store = AyuGramFilterStore(filters: [])
+
+        XCTAssertNil(ayuGramChatMessageFilterReason(
+            settings: AyuGramSettings(filtersEnabled: true, filtersEnabledInChats: true, hideFromBlocked: false),
+            store: store,
+            input: AyuGramFilterMatchInput(text: "hello", isBlockedPeer: true)
+        ))
+        XCTAssertEqual(ayuGramChatMessageFilterReason(
+            settings: AyuGramSettings(filtersEnabled: true, filtersEnabledInChats: true, hideFromBlocked: true),
+            store: store,
+            input: AyuGramFilterMatchInput(text: "hello", isBlockedPeer: true)
+        ), .blockedPeer)
+    }
+
+    func testShadowBannedAuthorReason() {
+        let store = AyuGramFilterStore(filters: [])
+        let settings = AyuGramSettings(shadowBanIds: Set([123]), filtersEnabled: true, filtersEnabledInChats: true)
+
+        XCTAssertEqual(ayuGramChatMessageFilterReason(
+            settings: settings,
+            store: store,
+            input: AyuGramFilterMatchInput(text: "hello", authorPeerId: 123)
+        ), .shadowBannedPeer)
+        XCTAssertNil(ayuGramChatMessageFilterReason(
+            settings: settings,
+            store: store,
+            input: AyuGramFilterMatchInput(text: "hello", authorPeerId: 456)
+        ))
+    }
+
+    func testRegexReasonIncludesFilterId() {
+        let store = AyuGramFilterStore(filters: [AyuGramFilter(id: "greeting", text: "hello")])
+        let settings = AyuGramSettings(filtersEnabled: true, filtersEnabledInChats: true)
+
+        XCTAssertEqual(ayuGramChatMessageFilterReason(
+            settings: settings,
+            store: store,
+            input: AyuGramFilterMatchInput(text: "hello")
+        ), .filter("greeting"))
+    }
+
+    func testActiveChatFiltersIncludesBlockedAndShadowBanRulesWithoutTextFilters() {
+        let emptyStore = AyuGramFilterStore(filters: [])
+
+        XCTAssertFalse(ayuGramHasActiveChatFilters(
+            settings: AyuGramSettings(filtersEnabled: false, filtersEnabledInChats: true, hideFromBlocked: true),
+            store: emptyStore
+        ))
+        XCTAssertFalse(ayuGramHasActiveChatFilters(
+            settings: AyuGramSettings(filtersEnabled: true, filtersEnabledInChats: false, shadowBanIds: Set([123])),
+            store: emptyStore
+        ))
+        XCTAssertTrue(ayuGramHasActiveChatFilters(
+            settings: AyuGramSettings(filtersEnabled: true, filtersEnabledInChats: true, hideFromBlocked: true),
+            store: emptyStore
+        ))
+        XCTAssertTrue(ayuGramHasActiveChatFilters(
+            settings: AyuGramSettings(filtersEnabled: true, filtersEnabledInChats: true, shadowBanIds: Set([123])),
+            store: emptyStore
+        ))
+        XCTAssertTrue(ayuGramHasActiveChatFilters(
+            settings: AyuGramSettings(filtersEnabled: true, filtersEnabledInChats: true),
+            store: AyuGramFilterStore(filters: [AyuGramFilter(text: "hello")])
+        ))
+    }
 }

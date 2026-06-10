@@ -2338,7 +2338,7 @@ public final class ChatHistoryListNodeImpl: ListViewImpl, ChatHistoryNode, ChatH
                     pinToTopStableId: pinToTopStableId
                 )
                 let lastHeaderId = filteredEntries.last.flatMap { listMessageDateHeaderId(timestamp: $0.index.timestamp) } ?? 0
-                let processedView = ChatHistoryView(originalView: view, filteredEntries: filteredEntries, hasAyuGramChatFiltering: ayuGramSettings.filtersEnabled && ayuGramSettings.filtersEnabledInChats && !ayuGramFilterStore.filters.isEmpty, associatedData: associatedData, lastHeaderId: lastHeaderId, id: id, locationInput: update.2, ignoreMessagesInTimestampRange: update.3, ignoreMessageIds: update.4)
+                let processedView = ChatHistoryView(originalView: view, filteredEntries: filteredEntries, hasAyuGramChatFiltering: ayuGramHasActiveChatFilters(settings: ayuGramSettings, store: ayuGramFilterStore), associatedData: associatedData, lastHeaderId: lastHeaderId, id: id, locationInput: update.2, ignoreMessagesInTimestampRange: update.3, ignoreMessageIds: update.4)
                 let previousValueAndVersion = previousView.swap((processedView, update.1, selectedMessages, allAdMessages.version))
                 let _ = chatHistoryEntriesForViewState.swap(updatedChatHistoryEntriesForViewState)
                 let previous = previousValueAndVersion?.0

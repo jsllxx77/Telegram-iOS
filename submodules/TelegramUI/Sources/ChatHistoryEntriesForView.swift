@@ -34,24 +34,97 @@ struct ChatHistoryEntriesForViewState {
     }
 }
 
-private func ayuGramShouldHideChatHistoryMessage(
-    _ message: Message,
-    settings: AyuGramSettings,
-    store: AyuGramFilterStore
-) -> Bool {
-    return ayuGramShouldHideChatMessage(
-        settings: settings,
-        store: store,
-        text: message.text,
-        dialogId: message.id.peerId.toInt64()
-    )
-}
-
 private func ayuGramDeletedBubbleFallbackMark(languageCode: String) -> String {
     if languageCode == "zh" || languageCode.hasPrefix("zh-") || languageCode.hasPrefix("zh_") {
         return "已删除"
     }
     return "Deleted"
+}
+
+private func ayuGramIsChineseLanguageCode(_ languageCode: String) -> Bool {
+    let normalized = languageCode.lowercased()
+    return normalized == "zh" || normalized.hasPrefix("zh-") || normalized.hasPrefix("zh_")
+}
+
+private func ayuGramFilteredBubbleText(reason: AyuGramFilterMatchReason, languageCode: String) -> String {
+    let isChinese = ayuGramIsChineseLanguageCode(languageCode)
+    switch reason {
+    case .blockedPeer:
+        return isChinese ? "[已屏蔽用户的消息]" : "[Blocked user message]"
+    case .shadowBannedPeer:
+        return isChinese ? "[影子封禁用户的消息]" : "[Shadow banned user message]"
+    case .filter(_):
+        return isChinese ? "[已过滤消息]" : "[Filtered message]"
+    }
+}
+
+private func ayuGramFilteredReasonString(_ reason: AyuGramFilterMatchReason) -> String {
+    switch reason {
+    case .blockedPeer:
+        return "blockedPeer"
+    case .shadowBannedPeer:
+        return "shadowBannedPeer"
+    case let .filter(id):
+        return "filter:\(id)"
+    }
+}
+
+private func ayuGramChatHistoryFilterReason(
+    _ message: Message,
+    settings: AyuGramSettings,
+    store: AyuGramFilterStore,
+    cachedData: CachedPeerData?
+) -> AyuGramFilterMatchReason? {
+    let authorPeerId = message.author?.id.toInt64()
+    var isBlockedPeer = false
+    if settings.hideFromBlocked, let cachedUserData = cachedData as? CachedUserData, cachedUserData.isBlocked {
+        if authorPeerId == nil || authorPeerId == message.id.peerId.toInt64() {
+            isBlockedPeer = true
+        }
+    }
+    return ayuGramChatMessageFilterReason(
+        settings: settings,
+        store: store,
+        input: AyuGramFilterMatchInput(
+            text: message.text,
+            dialogId: message.id.peerId.toInt64(),
+            authorPeerId: authorPeerId,
+            isBlockedPeer: isBlockedPeer
+        )
+    )
+}
+
+private func ayuGramMessageWithPlainText(_ message: Message, text: String, extraAttributes: [MessageAttribute] = []) -> Message {
+    var attributes = message.attributes.filter { attribute in
+        return !(attribute is TextEntitiesMessageAttribute)
+    }
+    attributes.append(contentsOf: extraAttributes)
+    return message.withUpdatedText(text).withUpdatedAttributes(attributes)
+}
+
+private func ayuGramStreamerModeProjection(_ message: Message, enabled: Bool) -> Message {
+    guard enabled, !message.text.isEmpty else {
+        return message
+    }
+    let policy = AyuGramStreamerModePolicy(isEnabled: true, hideMessagePreviews: false, redactSensitiveText: true)
+    let redactedText = AyuGramStreamerRedaction.sensitiveText(message.text, policy: policy)
+    guard redactedText != message.text else {
+        return message
+    }
+    return ayuGramMessageWithPlainText(message, text: redactedText)
+}
+
+private func ayuGramFilteredMessageProjection(_ message: Message, reason: AyuGramFilterMatchReason, languageCode: String) -> Message {
+    return ayuGramMessageWithPlainText(
+        message,
+        text: ayuGramFilteredBubbleText(reason: reason, languageCode: languageCode),
+        extraAttributes: [
+            AyuGramFilteredMessageAttribute(
+                reason: ayuGramFilteredReasonString(reason),
+                originalText: message.text
+            )
+        ]
+    ).withUpdatedMedia([])
 }
 
 private struct AyuGramDeletedBubbleCachedMediaPreview {
@@ -348,8 +421,10 @@ func chatHistoryEntriesForView(
             continue
         }
 
-        if ayuGramShouldHideChatHistoryMessage(message, settings: ayuGramSettings, store: ayuGramFilterStore) {
-            continue
+        if let filterReason = ayuGramChatHistoryFilterReason(message, settings: ayuGramSettings, store: ayuGramFilterStore, cachedData: cachedData) {
+            message = ayuGramFilteredMessageProjection(message, reason: filterReason, languageCode: presentationData.strings.baseLanguageCode)
+        } else {
+            message = ayuGramStreamerModeProjection(message, enabled: context.isAyuGramStreamerModeEnabled)
         }
         
         if case let .replyThread(replyThreadMessage) = location, replyThreadMessage.isForumPost {

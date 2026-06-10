@@ -1816,6 +1816,7 @@ public protocol AccountContext: AnyObject {
     var isFrozen: Bool { get }
     var isAyuGramPremiumStatusHidden: Bool { get }
     var isAyuGramStreamerModeEnabled: Bool { get }
+    var isAyuGramSendReadMessagesEnabled: Bool { get }
     var ayuGramInputControls: AyuGramInputControls { get }
     var ayuGramDrawerControls: AyuGramDrawerControls { get }
     var ayuGramWebViewControls: AyuGramWebViewControls { get }

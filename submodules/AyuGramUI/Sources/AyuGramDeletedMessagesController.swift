@@ -12,19 +12,39 @@ import TelegramPresentationData
 private final class AyuGramDeletedMessagesControllerArguments {
     let context: AccountContext
     let updateSearchQuery: (String) -> Void
+    let loadMore: () -> Void
     let clearHistory: () -> Void
     let presentController: (ViewController, Any?) -> Void
 
     init(
         context: AccountContext,
         updateSearchQuery: @escaping (String) -> Void,
+        loadMore: @escaping () -> Void,
         clearHistory: @escaping () -> Void,
         presentController: @escaping (ViewController, Any?) -> Void
     ) {
         self.context = context
         self.updateSearchQuery = updateSearchQuery
+        self.loadMore = loadMore
         self.clearHistory = clearHistory
         self.presentController = presentController
+    }
+}
+
+private let ayuGramDeletedMessagesPageSize = 100
+
+private func ayuGramRemoveDeletedSnapshotLocalMediaFiles(_ snapshots: [AyuGramMessageSnapshot]) {
+    var paths = Set<String>()
+    for snapshot in snapshots {
+        if let path = snapshot.mediaResourceLocalPath {
+            paths.insert(path)
+        }
+        if let path = snapshot.mediaThumbnailLocalPath {
+            paths.insert(path)
+        }
+    }
+    for path in paths {
+        try? FileManager.default.removeItem(atPath: path)
     }
 }
 
@@ -36,19 +56,21 @@ private enum AyuGramDeletedMessagesSection: Int32 {
 private enum AyuGramDeletedMessagesEntryId: Hashable {
     case search
     case snapshot(Int64, Int64, Int64?, Int32, Int32, Int32, Int32?, Int64?, String, String?)
+    case loadMore
     case empty
 }
 
 private enum AyuGramDeletedMessagesControllerEntry: ItemListNodeEntry {
     case search(String)
     case snapshot(Int, AyuGramMessageSnapshot)
+    case loadMore(Int, Int)
     case empty(String)
 
     var section: ItemListSectionId {
         switch self {
         case .search:
             return AyuGramDeletedMessagesSection.search.rawValue
-        case .snapshot, .empty:
+        case .snapshot, .loadMore, .empty:
             return AyuGramDeletedMessagesSection.history.rawValue
         }
     }
@@ -70,6 +92,8 @@ private enum AyuGramDeletedMessagesControllerEntry: ItemListNodeEntry {
                 snapshot.text,
                 snapshot.mediaSummary
             )
+        case .loadMore:
+            return .loadMore
         case .empty:
             return .empty
         }
@@ -85,9 +109,15 @@ private enum AyuGramDeletedMessagesControllerEntry: ItemListNodeEntry {
             return false
         case (.empty, .empty):
             return false
-        case (.empty, .snapshot):
+        case (.empty, .snapshot), (.empty, .loadMore):
             return false
-        case (.snapshot, .empty):
+        case (.snapshot, .empty), (.loadMore, .empty):
+            return true
+        case (.loadMore, .loadMore):
+            return false
+        case (.loadMore, .snapshot):
+            return false
+        case (.snapshot, .loadMore):
             return true
         case let (.snapshot(lhsIndex, _), .snapshot(rhsIndex, _)):
             return lhsIndex < rhsIndex
@@ -125,6 +155,19 @@ private enum AyuGramDeletedMessagesControllerEntry: ItemListNodeEntry {
                 sectionId: self.section,
                 style: .blocks
             )
+        case let .loadMore(visibleCount, totalCount):
+            return ItemListActionItem(
+                presentationData: presentationData,
+                systemStyle: .glass,
+                title: "\(ayuGramLocalized("Load More", languageCode: languageCode)) (\(visibleCount)/\(totalCount))",
+                kind: .generic,
+                alignment: .center,
+                sectionId: self.section,
+                style: .blocks,
+                action: {
+                    arguments.loadMore()
+                }
+            )
         case let .empty(text):
             return ItemListTextItem(
                 presentationData: presentationData,
@@ -139,7 +182,9 @@ private enum AyuGramDeletedMessagesControllerEntry: ItemListNodeEntry {
 
 private func ayuGramDeletedMessagesControllerEntries(
     snapshots: [AyuGramMessageSnapshot],
-    searchQuery: String
+    searchQuery: String,
+    visibleCount: Int,
+    totalCount: Int
 ) -> [AyuGramDeletedMessagesControllerEntry] {
     var entries: [AyuGramDeletedMessagesControllerEntry] = []
 
@@ -158,6 +203,9 @@ private func ayuGramDeletedMessagesControllerEntries(
     for (index, snapshot) in snapshots.enumerated() {
         entries.append(.snapshot(index, snapshot))
     }
+    if visibleCount < totalCount {
+        entries.append(.loadMore(visibleCount, totalCount))
+    }
 
     return entries
 }
@@ -167,22 +215,35 @@ public func ayuGramDeletedMessagesController(context: AccountContext, peerId: Pe
     let accountPeerId = context.account.peerId.toInt64()
     let peerIdValue = peerId.toInt64()
     let searchQuery = ValuePromise<String>("", ignoreRepeated: true)
+    let visibleCount = ValuePromise<Int>(ayuGramDeletedMessagesPageSize, ignoreRepeated: true)
+    var currentVisibleCount = ayuGramDeletedMessagesPageSize
 
     let clearHistory: () -> Void = {
         let _ = context.engine.preferences.update(id: storeKey) { entry -> EnginePreferencesEntry? in
             var store = entry?.get(AyuGramMessageHistoryStore.self) ?? .empty
+            let removedSnapshots: [AyuGramMessageSnapshot]
             if let threadId = threadId {
+                removedSnapshots = store.deletedSnapshots.filter { snapshot in
+                    return snapshot.accountPeerId == accountPeerId
+                        && snapshot.peerId == peerIdValue
+                        && snapshot.threadId == threadId
+                }
                 store.clearDeletedSnapshotsInThread(
                     accountPeerId: accountPeerId,
                     peerId: peerIdValue,
                     threadId: threadId
                 )
             } else {
+                removedSnapshots = store.deletedSnapshots.filter { snapshot in
+                    return snapshot.accountPeerId == accountPeerId
+                        && snapshot.peerId == peerIdValue
+                }
                 store.clearDeletedSnapshots(
                     accountPeerId: accountPeerId,
                     peerId: peerIdValue
                 )
             }
+            ayuGramRemoveDeletedSnapshotLocalMediaFiles(removedSnapshots)
             return EnginePreferencesEntry(store)
         }.start()
     }
@@ -191,7 +252,13 @@ public func ayuGramDeletedMessagesController(context: AccountContext, peerId: Pe
     let arguments = AyuGramDeletedMessagesControllerArguments(
         context: context,
         updateSearchQuery: { value in
+            currentVisibleCount = ayuGramDeletedMessagesPageSize
             searchQuery.set(value)
+            visibleCount.set(currentVisibleCount)
+        },
+        loadMore: {
+            currentVisibleCount += ayuGramDeletedMessagesPageSize
+            visibleCount.set(currentVisibleCount)
         },
         clearHistory: clearHistory,
         presentController: { controller, arguments in
@@ -210,34 +277,52 @@ public func ayuGramDeletedMessagesController(context: AccountContext, peerId: Pe
     let signal = combineLatest(
         context.sharedContext.presentationData,
         historyStore,
-        searchQuery.get()
+        searchQuery.get(),
+        visibleCount.get()
     )
     |> deliverOnMainQueue
-    |> map { presentationData, store, searchQuery -> (ItemListControllerState, (ItemListNodeState, Any)) in
+    |> map { presentationData, store, searchQuery, visibleCount -> (ItemListControllerState, (ItemListNodeState, Any)) in
         let languageCode = presentationData.strings.baseLanguageCode
         let allSnapshots: [AyuGramMessageSnapshot]
+        let matchingSnapshots: [AyuGramMessageSnapshot]
         let snapshots: [AyuGramMessageSnapshot]
+        let safeVisibleCount = max(ayuGramDeletedMessagesPageSize, visibleCount)
         if let threadId = threadId {
             allSnapshots = store.listDeletedSnapshotsInThread(
                 accountPeerId: accountPeerId,
                 peerId: peerIdValue,
                 threadId: threadId
             )
-            snapshots = store.listDeletedSnapshotsInThread(
+            matchingSnapshots = store.listDeletedSnapshotsInThread(
                 accountPeerId: accountPeerId,
                 peerId: peerIdValue,
                 threadId: threadId,
                 searchQuery: searchQuery
+            )
+            snapshots = store.listDeletedSnapshotsInThread(
+                accountPeerId: accountPeerId,
+                peerId: peerIdValue,
+                threadId: threadId,
+                searchQuery: searchQuery,
+                offset: 0,
+                limit: safeVisibleCount
             )
         } else {
             allSnapshots = store.listDeletedSnapshots(
                 accountPeerId: accountPeerId,
                 peerId: peerIdValue
             )
-            snapshots = store.listDeletedSnapshots(
+            matchingSnapshots = store.listDeletedSnapshots(
                 accountPeerId: accountPeerId,
                 peerId: peerIdValue,
                 searchQuery: searchQuery
+            )
+            snapshots = store.listDeletedSnapshots(
+                accountPeerId: accountPeerId,
+                peerId: peerIdValue,
+                searchQuery: searchQuery,
+                offset: 0,
+                limit: safeVisibleCount
             )
         }
 
@@ -275,7 +360,12 @@ public func ayuGramDeletedMessagesController(context: AccountContext, peerId: Pe
         )
         let listState = ItemListNodeState(
             presentationData: ItemListPresentationData(presentationData),
-            entries: ayuGramDeletedMessagesControllerEntries(snapshots: snapshots, searchQuery: searchQuery),
+            entries: ayuGramDeletedMessagesControllerEntries(
+                snapshots: snapshots,
+                searchQuery: searchQuery,
+                visibleCount: snapshots.count,
+                totalCount: matchingSnapshots.count
+            ),
             style: .blocks,
             animateChanges: false
         )

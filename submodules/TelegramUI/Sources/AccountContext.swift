@@ -554,6 +554,7 @@ public final class AccountContextImpl: AccountContext {
             return AccountMessageHistoryPolicy(
                 saveDeletedMessages: settings.saveDeletedMessages,
                 saveMessagesHistory: settings.saveMessagesHistory,
+                deletedMessagesStorageLimit: settings.deletedMessagesStorageLimit,
                 saveForBots: settings.saveForBots
             )
         }

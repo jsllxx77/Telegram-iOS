@@ -14,6 +14,8 @@ import Display
 import TelegramStringFormatting
 import AyuGramCore
 
+private let ayuGramDeletedBubbleInlineLimit = 200
+
 struct ChatHistoryEntriesForViewState {
     private var messageStableIdToLocalId: [UInt32: Int64] = [:]
     
@@ -152,18 +154,32 @@ private struct AyuGramDeletedBubbleCachedMediaPreview {
     }
 }
 
+private func ayuGramExistingLocalMediaPath(_ path: String?) -> String? {
+    guard let path, FileManager.default.fileExists(atPath: path) else {
+        return nil
+    }
+    return path
+}
+
 private func ayuGramDeletedBubbleCachedMediaPreview(
     snapshot: AyuGramMessageSnapshot,
     context: AccountContext
 ) -> AyuGramDeletedBubbleCachedMediaPreview? {
     var result = AyuGramDeletedBubbleCachedMediaPreview(
-        primaryResourceId: nil,
-        primaryPath: nil,
-        thumbnailResourceId: nil,
-        thumbnailPath: nil
+        primaryResourceId: snapshot.mediaResourceId,
+        primaryPath: ayuGramExistingLocalMediaPath(snapshot.mediaResourceLocalPath),
+        thumbnailResourceId: snapshot.mediaThumbnailResourceId,
+        thumbnailPath: ayuGramExistingLocalMediaPath(snapshot.mediaThumbnailLocalPath)
     )
 
     for candidate in ayuGramDeletedBubbleMediaPreviewResourceCandidates(snapshot) {
+        if candidate.role == .primary && result.primaryPath != nil {
+            continue
+        }
+        if candidate.role == .thumbnail && result.thumbnailPath != nil {
+            continue
+        }
+
         let pathExtensions: [String?]
         if candidate.role == .primary && (snapshot.mediaKind == "video" || snapshot.mediaKind == "roundVideo") {
             pathExtensions = ["mp4", "mov", nil]
@@ -202,6 +218,68 @@ private func ayuGramDeletedBubbleCachedMediaPreview(
     }
 }
 
+private func ayuGramDeletedSnapshotForwardInfo(
+    snapshot: AyuGramMessageSnapshot,
+    peerLookup: [PeerId: Peer]
+) -> MessageForwardInfo? {
+    guard let date = snapshot.forwardDate else {
+        return nil
+    }
+
+    let author = snapshot.forwardAuthorPeerId.flatMap { peerLookup[PeerId($0)] }
+    let source = snapshot.forwardSourcePeerId.flatMap { peerLookup[PeerId($0)] }
+    let sourceMessageId: MessageId?
+    if let sourcePeerId = snapshot.forwardSourcePeerId, let namespace = snapshot.forwardSourceMessageNamespace, let id = snapshot.forwardSourceMessageId {
+        sourceMessageId = MessageId(peerId: PeerId(sourcePeerId), namespace: namespace, id: id)
+    } else {
+        sourceMessageId = nil
+    }
+
+    return MessageForwardInfo(
+        author: author,
+        source: source,
+        sourceMessageId: sourceMessageId,
+        date: date,
+        authorSignature: snapshot.forwardAuthorSignature,
+        psaType: snapshot.forwardPsaType,
+        flags: MessageForwardInfo.Flags(rawValue: snapshot.forwardFlags ?? 0)
+    )
+}
+
+private func ayuGramDeletedSnapshotTextEntitiesAttribute(
+    snapshot: AyuGramMessageSnapshot,
+    displayText: String
+) -> TextEntitiesMessageAttribute? {
+    guard let entitiesData = snapshot.entitiesData else {
+        return nil
+    }
+    guard let originalAttribute = PostboxDecoder(buffer: MemoryBuffer(data: entitiesData)).decodeRootObject() as? TextEntitiesMessageAttribute else {
+        return nil
+    }
+
+    let trimmedText = snapshot.text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmedText.isEmpty, trimmedText == snapshot.text, let textRange = displayText.range(of: trimmedText) else {
+        return nil
+    }
+
+    let offset = (String(displayText[..<textRange.lowerBound]) as NSString).length
+    let textLength = (snapshot.text as NSString).length
+    let entities = originalAttribute.entities.compactMap { entity -> MessageTextEntity? in
+        guard entity.range.lowerBound >= 0, entity.range.upperBound <= textLength else {
+            return nil
+        }
+        return MessageTextEntity(
+            range: (entity.range.lowerBound + offset) ..< (entity.range.upperBound + offset),
+            type: entity.type
+        )
+    }
+
+    if entities.isEmpty {
+        return nil
+    }
+    return TextEntitiesMessageAttribute(entities: entities)
+}
+
 private func ayuGramDeletedSnapshotMessage(
     snapshot: AyuGramMessageSnapshot,
     peerId: PeerId,
@@ -220,6 +298,12 @@ private func ayuGramDeletedSnapshotMessage(
     if let peer = peerLookup[peerId] {
         peers[peerId] = peer
     }
+    if let forwardAuthorPeerId = snapshot.forwardAuthorPeerId, let peer = peerLookup[PeerId(forwardAuthorPeerId)] {
+        peers[PeerId(forwardAuthorPeerId)] = peer
+    }
+    if let forwardSourcePeerId = snapshot.forwardSourcePeerId, let peer = peerLookup[PeerId(forwardSourcePeerId)] {
+        peers[PeerId(forwardSourcePeerId)] = peer
+    }
 
     let flags: MessageFlags
     if authorPeerId == accountPeerId {
@@ -228,12 +312,54 @@ private func ayuGramDeletedSnapshotMessage(
         flags = [.Incoming]
     }
 
+    let displayText = ayuGramDeletedBubbleDisplayText(
+        snapshot: snapshot,
+        deletedMark: settings.deletedMark,
+        fallbackDeletedMark: ayuGramDeletedBubbleFallbackMark(languageCode: presentationData.strings.baseLanguageCode)
+    )
+    var attributes: [MessageAttribute] = [AyuGramDeletedMessageAttribute(
+        originalNamespace: snapshot.messageNamespace,
+        originalId: snapshot.messageId,
+        threadId: snapshot.threadId,
+        createdAt: snapshot.createdAt,
+        mediaKind: snapshot.mediaKind,
+        mediaMimeType: snapshot.mediaMimeType,
+        mediaFileName: snapshot.mediaFileName,
+        mediaDuration: snapshot.mediaDuration,
+        mediaDimensions: snapshot.mediaDimensions,
+        mediaPreviewResourceId: cachedMediaPreview?.previewResourceId,
+        mediaPreviewResourceRole: cachedMediaPreview?.previewResourceRole,
+        mediaPreviewPath: cachedMediaPreview?.previewPath,
+        mediaPrimaryResourceId: cachedMediaPreview?.primaryResourceId,
+        mediaPrimaryPath: cachedMediaPreview?.primaryPath,
+        mediaThumbnailResourceId: cachedMediaPreview?.thumbnailResourceId,
+        mediaThumbnailPath: cachedMediaPreview?.thumbnailPath
+    )]
+    if let entitiesAttribute = ayuGramDeletedSnapshotTextEntitiesAttribute(snapshot: snapshot, displayText: displayText) {
+        attributes.append(entitiesAttribute)
+    }
+    if let replyPeerId = snapshot.replyMessagePeerId, let replyNamespace = snapshot.replyMessageNamespace, let replyId = snapshot.replyMessageId {
+        let threadMessageId: MessageId?
+        if let threadPeerId = snapshot.replyThreadMessagePeerId, let threadNamespace = snapshot.replyThreadMessageNamespace, let threadId = snapshot.replyThreadMessageId {
+            threadMessageId = MessageId(peerId: PeerId(threadPeerId), namespace: threadNamespace, id: threadId)
+        } else {
+            threadMessageId = nil
+        }
+        attributes.append(ReplyMessageAttribute(
+            messageId: MessageId(peerId: PeerId(replyPeerId), namespace: replyNamespace, id: replyId),
+            threadMessageId: threadMessageId,
+            quote: nil,
+            isQuote: snapshot.replyIsQuote ?? false,
+            innerSubject: nil
+        ))
+    }
+
     return Message(
         stableId: ayuGramDeletedBubbleStableId(snapshot),
         stableVersion: 0,
         id: MessageId(peerId: peerId, namespace: Namespaces.Message.Local, id: ayuGramDeletedBubbleLocalMessageId(snapshot)),
-        globallyUniqueId: nil,
-        groupingKey: nil,
+        globallyUniqueId: snapshot.globallyUniqueId,
+        groupingKey: snapshot.groupingKey,
         groupInfo: nil,
         threadId: snapshot.threadId,
         timestamp: snapshot.timestamp,
@@ -242,31 +368,10 @@ private func ayuGramDeletedSnapshotMessage(
         globalTags: [],
         localTags: [],
         customTags: [],
-        forwardInfo: nil,
+        forwardInfo: ayuGramDeletedSnapshotForwardInfo(snapshot: snapshot, peerLookup: peerLookup),
         author: author,
-        text: ayuGramDeletedBubbleDisplayText(
-            snapshot: snapshot,
-            deletedMark: settings.deletedMark,
-            fallbackDeletedMark: ayuGramDeletedBubbleFallbackMark(languageCode: presentationData.strings.baseLanguageCode)
-        ),
-        attributes: [AyuGramDeletedMessageAttribute(
-            originalNamespace: snapshot.messageNamespace,
-            originalId: snapshot.messageId,
-            threadId: snapshot.threadId,
-            createdAt: snapshot.createdAt,
-            mediaKind: snapshot.mediaKind,
-            mediaMimeType: snapshot.mediaMimeType,
-            mediaFileName: snapshot.mediaFileName,
-            mediaDuration: snapshot.mediaDuration,
-            mediaDimensions: snapshot.mediaDimensions,
-            mediaPreviewResourceId: cachedMediaPreview?.previewResourceId,
-            mediaPreviewResourceRole: cachedMediaPreview?.previewResourceRole,
-            mediaPreviewPath: cachedMediaPreview?.previewPath,
-            mediaPrimaryResourceId: cachedMediaPreview?.primaryResourceId,
-            mediaPrimaryPath: cachedMediaPreview?.primaryPath,
-            mediaThumbnailResourceId: cachedMediaPreview?.thumbnailResourceId,
-            mediaThumbnailPath: cachedMediaPreview?.thumbnailPath
-        )],
+        text: displayText,
+        attributes: attributes,
         media: [],
         peers: SimpleDictionary(peers),
         associatedMessages: SimpleDictionary<MessageId, Message>(),
@@ -624,12 +729,14 @@ func chatHistoryEntriesForView(
             deletedSnapshots = ayuGramMessageHistoryStore.listDeletedSnapshotsInThread(
                 accountPeerId: accountPeerIdValue,
                 peerId: peerIdValue,
-                threadId: threadId
+                threadId: threadId,
+                limit: ayuGramDeletedBubbleInlineLimit
             )
         } else {
             deletedSnapshots = ayuGramMessageHistoryStore.listDeletedSnapshotsWithoutThread(
                 accountPeerId: accountPeerIdValue,
-                peerId: peerIdValue
+                peerId: peerIdValue,
+                limit: ayuGramDeletedBubbleInlineLimit
             )
         }
 

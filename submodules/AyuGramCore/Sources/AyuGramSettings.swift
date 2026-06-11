@@ -141,6 +141,7 @@ private struct AyuGramGhostAccountSettingsEntry: Codable, Equatable {
 public struct AyuGramSettings: Codable, Equatable {
     public var saveDeletedMessages: Bool
     public var saveMessagesHistory: Bool
+    public var deletedMessagesStorageLimit: Int32
     public var saveForBots: Bool
     public var shadowBanIds: Set<Int64>
     public var filtersEnabled: Bool
@@ -230,11 +231,13 @@ public struct AyuGramSettings: Codable, Equatable {
     public var ghostAccounts: [Int64: AyuGramGhostSettings]
     public var messageShotSettings: AyuGramMessageShotSettings
 
+    public static let defaultDeletedMessagesStorageLimit: Int32 = Int32(AyuGramMessageHistoryStore.defaultDeletedSnapshotsLimit)
     public static let defaultSettings = AyuGramSettings()
 
     public init(
         saveDeletedMessages: Bool = true,
         saveMessagesHistory: Bool = true,
+        deletedMessagesStorageLimit: Int32 = AyuGramSettings.defaultDeletedMessagesStorageLimit,
         saveForBots: Bool = false,
         shadowBanIds: Set<Int64> = Set(),
         filtersEnabled: Bool = false,
@@ -326,6 +329,7 @@ public struct AyuGramSettings: Codable, Equatable {
     ) {
         self.saveDeletedMessages = saveDeletedMessages
         self.saveMessagesHistory = saveMessagesHistory
+        self.deletedMessagesStorageLimit = deletedMessagesStorageLimit
         self.saveForBots = saveForBots
         self.shadowBanIds = shadowBanIds
         self.filtersEnabled = filtersEnabled
@@ -419,6 +423,7 @@ public struct AyuGramSettings: Codable, Equatable {
     private enum CodingKeys: String, CodingKey {
         case saveDeletedMessages
         case saveMessagesHistory
+        case deletedMessagesStorageLimit
         case saveForBots
         case shadowBanIds
         case filtersEnabled
@@ -515,6 +520,7 @@ public struct AyuGramSettings: Codable, Equatable {
 
         self.saveDeletedMessages = container.decodeIfPresent(Bool.self, forKey: .saveDeletedMessages, fallback: defaults.saveDeletedMessages)
         self.saveMessagesHistory = container.decodeIfPresent(Bool.self, forKey: .saveMessagesHistory, fallback: defaults.saveMessagesHistory)
+        self.deletedMessagesStorageLimit = container.decodeIfPresent(Int32.self, forKey: .deletedMessagesStorageLimit, fallback: defaults.deletedMessagesStorageLimit)
         self.saveForBots = container.decodeIfPresent(Bool.self, forKey: .saveForBots, fallback: defaults.saveForBots)
         self.shadowBanIds = container.decodeIfPresent(Set<Int64>.self, forKey: .shadowBanIds, fallback: defaults.shadowBanIds)
         self.filtersEnabled = container.decodeIfPresent(Bool.self, forKey: .filtersEnabled, fallback: defaults.filtersEnabled)
@@ -618,6 +624,7 @@ public struct AyuGramSettings: Codable, Equatable {
 
         try container.encode(self.saveDeletedMessages, forKey: .saveDeletedMessages)
         try container.encode(self.saveMessagesHistory, forKey: .saveMessagesHistory)
+        try container.encode(self.deletedMessagesStorageLimit, forKey: .deletedMessagesStorageLimit)
         try container.encode(self.saveForBots, forKey: .saveForBots)
         try container.encode(self.shadowBanIds, forKey: .shadowBanIds)
         try container.encode(self.filtersEnabled, forKey: .filtersEnabled)

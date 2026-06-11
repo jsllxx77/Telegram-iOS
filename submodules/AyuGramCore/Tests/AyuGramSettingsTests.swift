@@ -16,4 +16,19 @@ final class AyuGramSettingsTests: XCTestCase {
 
         XCTAssertEqual(decoded.liquidGlassStyle, .compatibility)
     }
+
+    func testDeletedMessagesStorageLimitDefaults() throws {
+        let data = try JSONEncoder().encode([String: Int]())
+        let settings = try JSONDecoder().decode(AyuGramSettings.self, from: data)
+
+        XCTAssertEqual(settings.deletedMessagesStorageLimit, AyuGramSettings.defaultDeletedMessagesStorageLimit)
+    }
+
+    func testDeletedMessagesStorageLimitRoundTrips() throws {
+        let settings = AyuGramSettings(deletedMessagesStorageLimit: 10000)
+        let data = try JSONEncoder().encode(settings)
+        let decoded = try JSONDecoder().decode(AyuGramSettings.self, from: data)
+
+        XCTAssertEqual(decoded.deletedMessagesStorageLimit, 10000)
+    }
 }

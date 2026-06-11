@@ -7,6 +7,8 @@ public struct AyuGramMessageSnapshot: Codable, Equatable {
     public var messageNamespace: Int32
     public var messageId: Int32
     public var stableId: Int64?
+    public var globallyUniqueId: Int64?
+    public var groupingKey: Int64?
     public var authorPeerId: Int64?
     public var timestamp: Int32
     public var editTimestamp: Int32?
@@ -22,6 +24,23 @@ public struct AyuGramMessageSnapshot: Codable, Equatable {
     public var mediaFileName: String?
     public var mediaDuration: Double?
     public var mediaDimensions: String?
+    public var mediaResourceLocalPath: String?
+    public var mediaThumbnailLocalPath: String?
+    public var forwardAuthorPeerId: Int64?
+    public var forwardSourcePeerId: Int64?
+    public var forwardSourceMessageNamespace: Int32?
+    public var forwardSourceMessageId: Int32?
+    public var forwardDate: Int32?
+    public var forwardAuthorSignature: String?
+    public var forwardPsaType: String?
+    public var forwardFlags: Int32?
+    public var replyMessagePeerId: Int64?
+    public var replyMessageNamespace: Int32?
+    public var replyMessageId: Int32?
+    public var replyThreadMessagePeerId: Int64?
+    public var replyThreadMessageNamespace: Int32?
+    public var replyThreadMessageId: Int32?
+    public var replyIsQuote: Bool?
     public var createdAt: Int32
 
     private enum CodingKeys: String, CodingKey {
@@ -31,6 +50,8 @@ public struct AyuGramMessageSnapshot: Codable, Equatable {
         case messageNamespace
         case messageId
         case stableId
+        case globallyUniqueId
+        case groupingKey
         case authorPeerId
         case timestamp
         case editTimestamp
@@ -46,6 +67,23 @@ public struct AyuGramMessageSnapshot: Codable, Equatable {
         case mediaFileName
         case mediaDuration
         case mediaDimensions
+        case mediaResourceLocalPath
+        case mediaThumbnailLocalPath
+        case forwardAuthorPeerId
+        case forwardSourcePeerId
+        case forwardSourceMessageNamespace
+        case forwardSourceMessageId
+        case forwardDate
+        case forwardAuthorSignature
+        case forwardPsaType
+        case forwardFlags
+        case replyMessagePeerId
+        case replyMessageNamespace
+        case replyMessageId
+        case replyThreadMessagePeerId
+        case replyThreadMessageNamespace
+        case replyThreadMessageId
+        case replyIsQuote
         case createdAt
     }
 
@@ -56,6 +94,8 @@ public struct AyuGramMessageSnapshot: Codable, Equatable {
         messageNamespace: Int32,
         messageId: Int32,
         stableId: Int64?,
+        globallyUniqueId: Int64? = nil,
+        groupingKey: Int64? = nil,
         authorPeerId: Int64?,
         timestamp: Int32,
         editTimestamp: Int32?,
@@ -71,6 +111,23 @@ public struct AyuGramMessageSnapshot: Codable, Equatable {
         mediaFileName: String? = nil,
         mediaDuration: Double? = nil,
         mediaDimensions: String? = nil,
+        mediaResourceLocalPath: String? = nil,
+        mediaThumbnailLocalPath: String? = nil,
+        forwardAuthorPeerId: Int64? = nil,
+        forwardSourcePeerId: Int64? = nil,
+        forwardSourceMessageNamespace: Int32? = nil,
+        forwardSourceMessageId: Int32? = nil,
+        forwardDate: Int32? = nil,
+        forwardAuthorSignature: String? = nil,
+        forwardPsaType: String? = nil,
+        forwardFlags: Int32? = nil,
+        replyMessagePeerId: Int64? = nil,
+        replyMessageNamespace: Int32? = nil,
+        replyMessageId: Int32? = nil,
+        replyThreadMessagePeerId: Int64? = nil,
+        replyThreadMessageNamespace: Int32? = nil,
+        replyThreadMessageId: Int32? = nil,
+        replyIsQuote: Bool? = nil,
         createdAt: Int32
     ) {
         self.accountPeerId = accountPeerId
@@ -79,6 +136,8 @@ public struct AyuGramMessageSnapshot: Codable, Equatable {
         self.messageNamespace = messageNamespace
         self.messageId = messageId
         self.stableId = stableId
+        self.globallyUniqueId = globallyUniqueId
+        self.groupingKey = groupingKey
         self.authorPeerId = authorPeerId
         self.timestamp = timestamp
         self.editTimestamp = editTimestamp
@@ -94,6 +153,23 @@ public struct AyuGramMessageSnapshot: Codable, Equatable {
         self.mediaFileName = mediaFileName
         self.mediaDuration = mediaDuration
         self.mediaDimensions = mediaDimensions
+        self.mediaResourceLocalPath = mediaResourceLocalPath
+        self.mediaThumbnailLocalPath = mediaThumbnailLocalPath
+        self.forwardAuthorPeerId = forwardAuthorPeerId
+        self.forwardSourcePeerId = forwardSourcePeerId
+        self.forwardSourceMessageNamespace = forwardSourceMessageNamespace
+        self.forwardSourceMessageId = forwardSourceMessageId
+        self.forwardDate = forwardDate
+        self.forwardAuthorSignature = forwardAuthorSignature
+        self.forwardPsaType = forwardPsaType
+        self.forwardFlags = forwardFlags
+        self.replyMessagePeerId = replyMessagePeerId
+        self.replyMessageNamespace = replyMessageNamespace
+        self.replyMessageId = replyMessageId
+        self.replyThreadMessagePeerId = replyThreadMessagePeerId
+        self.replyThreadMessageNamespace = replyThreadMessageNamespace
+        self.replyThreadMessageId = replyThreadMessageId
+        self.replyIsQuote = replyIsQuote
         self.createdAt = createdAt
     }
 
@@ -127,6 +203,8 @@ public struct AyuGramMessageSnapshot: Codable, Equatable {
         self.messageNamespace = container.decodeIfPresent(Int32.self, forKey: .messageNamespace, fallback: 0)
         self.messageId = container.decodeIfPresent(Int32.self, forKey: .messageId, fallback: 0)
         self.stableId = try? container.decodeIfPresent(Int64.self, forKey: .stableId)
+        self.globallyUniqueId = try? container.decodeIfPresent(Int64.self, forKey: .globallyUniqueId)
+        self.groupingKey = try? container.decodeIfPresent(Int64.self, forKey: .groupingKey)
         self.authorPeerId = try? container.decodeIfPresent(Int64.self, forKey: .authorPeerId)
         self.timestamp = container.decodeIfPresent(Int32.self, forKey: .timestamp, fallback: 0)
         self.editTimestamp = try? container.decodeIfPresent(Int32.self, forKey: .editTimestamp)
@@ -142,6 +220,23 @@ public struct AyuGramMessageSnapshot: Codable, Equatable {
         self.mediaFileName = try? container.decodeIfPresent(String.self, forKey: .mediaFileName)
         self.mediaDuration = try? container.decodeIfPresent(Double.self, forKey: .mediaDuration)
         self.mediaDimensions = try? container.decodeIfPresent(String.self, forKey: .mediaDimensions)
+        self.mediaResourceLocalPath = try? container.decodeIfPresent(String.self, forKey: .mediaResourceLocalPath)
+        self.mediaThumbnailLocalPath = try? container.decodeIfPresent(String.self, forKey: .mediaThumbnailLocalPath)
+        self.forwardAuthorPeerId = try? container.decodeIfPresent(Int64.self, forKey: .forwardAuthorPeerId)
+        self.forwardSourcePeerId = try? container.decodeIfPresent(Int64.self, forKey: .forwardSourcePeerId)
+        self.forwardSourceMessageNamespace = try? container.decodeIfPresent(Int32.self, forKey: .forwardSourceMessageNamespace)
+        self.forwardSourceMessageId = try? container.decodeIfPresent(Int32.self, forKey: .forwardSourceMessageId)
+        self.forwardDate = try? container.decodeIfPresent(Int32.self, forKey: .forwardDate)
+        self.forwardAuthorSignature = try? container.decodeIfPresent(String.self, forKey: .forwardAuthorSignature)
+        self.forwardPsaType = try? container.decodeIfPresent(String.self, forKey: .forwardPsaType)
+        self.forwardFlags = try? container.decodeIfPresent(Int32.self, forKey: .forwardFlags)
+        self.replyMessagePeerId = try? container.decodeIfPresent(Int64.self, forKey: .replyMessagePeerId)
+        self.replyMessageNamespace = try? container.decodeIfPresent(Int32.self, forKey: .replyMessageNamespace)
+        self.replyMessageId = try? container.decodeIfPresent(Int32.self, forKey: .replyMessageId)
+        self.replyThreadMessagePeerId = try? container.decodeIfPresent(Int64.self, forKey: .replyThreadMessagePeerId)
+        self.replyThreadMessageNamespace = try? container.decodeIfPresent(Int32.self, forKey: .replyThreadMessageNamespace)
+        self.replyThreadMessageId = try? container.decodeIfPresent(Int32.self, forKey: .replyThreadMessageId)
+        self.replyIsQuote = try? container.decodeIfPresent(Bool.self, forKey: .replyIsQuote)
         self.createdAt = container.decodeIfPresent(Int32.self, forKey: .createdAt, fallback: self.timestamp)
     }
 
@@ -154,6 +249,8 @@ public struct AyuGramMessageSnapshot: Codable, Equatable {
         try container.encode(self.messageNamespace, forKey: .messageNamespace)
         try container.encode(self.messageId, forKey: .messageId)
         try container.encodeIfPresent(self.stableId, forKey: .stableId)
+        try container.encodeIfPresent(self.globallyUniqueId, forKey: .globallyUniqueId)
+        try container.encodeIfPresent(self.groupingKey, forKey: .groupingKey)
         try container.encodeIfPresent(self.authorPeerId, forKey: .authorPeerId)
         try container.encode(self.timestamp, forKey: .timestamp)
         try container.encodeIfPresent(self.editTimestamp, forKey: .editTimestamp)
@@ -169,6 +266,23 @@ public struct AyuGramMessageSnapshot: Codable, Equatable {
         try container.encodeIfPresent(self.mediaFileName, forKey: .mediaFileName)
         try container.encodeIfPresent(self.mediaDuration, forKey: .mediaDuration)
         try container.encodeIfPresent(self.mediaDimensions, forKey: .mediaDimensions)
+        try container.encodeIfPresent(self.mediaResourceLocalPath, forKey: .mediaResourceLocalPath)
+        try container.encodeIfPresent(self.mediaThumbnailLocalPath, forKey: .mediaThumbnailLocalPath)
+        try container.encodeIfPresent(self.forwardAuthorPeerId, forKey: .forwardAuthorPeerId)
+        try container.encodeIfPresent(self.forwardSourcePeerId, forKey: .forwardSourcePeerId)
+        try container.encodeIfPresent(self.forwardSourceMessageNamespace, forKey: .forwardSourceMessageNamespace)
+        try container.encodeIfPresent(self.forwardSourceMessageId, forKey: .forwardSourceMessageId)
+        try container.encodeIfPresent(self.forwardDate, forKey: .forwardDate)
+        try container.encodeIfPresent(self.forwardAuthorSignature, forKey: .forwardAuthorSignature)
+        try container.encodeIfPresent(self.forwardPsaType, forKey: .forwardPsaType)
+        try container.encodeIfPresent(self.forwardFlags, forKey: .forwardFlags)
+        try container.encodeIfPresent(self.replyMessagePeerId, forKey: .replyMessagePeerId)
+        try container.encodeIfPresent(self.replyMessageNamespace, forKey: .replyMessageNamespace)
+        try container.encodeIfPresent(self.replyMessageId, forKey: .replyMessageId)
+        try container.encodeIfPresent(self.replyThreadMessagePeerId, forKey: .replyThreadMessagePeerId)
+        try container.encodeIfPresent(self.replyThreadMessageNamespace, forKey: .replyThreadMessageNamespace)
+        try container.encodeIfPresent(self.replyThreadMessageId, forKey: .replyThreadMessageId)
+        try container.encodeIfPresent(self.replyIsQuote, forKey: .replyIsQuote)
         try container.encode(self.createdAt, forKey: .createdAt)
     }
 }

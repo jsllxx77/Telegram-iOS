@@ -12,6 +12,7 @@ swift_library(
     deps = [
         "//submodules/AsyncDisplayKit",
         "//submodules/Display",
+        "//submodules/Postbox",
         "//submodules/TelegramCore",
         "//submodules/TextFormat",
         "//submodules/UrlEscaping",
@@ -37,8 +38,6 @@ swift_library(
         "//submodules/TelegramUI/Components/TextLoadingEffect",
         "//submodules/TelegramUI/Components/ChatControllerInteraction",
         "//submodules/TelegramUI/Components/InteractiveTextComponent",
-        "//submodules/TelegramUI/Components/ShimmeringMask",
-        "//submodules/TelegramUI/Components/StreamingTextReveal:StreamingTextReveal",
     ],
     visibility = [
         "//visibility:public",

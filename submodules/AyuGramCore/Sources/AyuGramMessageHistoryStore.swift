@@ -1,9 +1,24 @@
 import Foundation
 
+private struct AyuGramDeletedSnapshotIdentity: Hashable {
+    var accountPeerId: Int64
+    var peerId: Int64
+    var messageNamespace: Int32
+    var messageId: Int32
+
+    init(_ snapshot: AyuGramMessageSnapshot) {
+        self.accountPeerId = snapshot.accountPeerId
+        self.peerId = snapshot.peerId
+        self.messageNamespace = snapshot.messageNamespace
+        self.messageId = snapshot.messageId
+    }
+}
+
 public struct AyuGramMessageHistoryStore: Codable, Equatable {
     public private(set) var editedSnapshots: [AyuGramMessageSnapshot]
     public private(set) var deletedSnapshots: [AyuGramMessageSnapshot]
 
+    public static let defaultDeletedSnapshotsLimit = 5000
     public static let empty = AyuGramMessageHistoryStore()
 
     private enum CodingKeys: String, CodingKey {
@@ -25,12 +40,17 @@ public struct AyuGramMessageHistoryStore: Codable, Equatable {
         }
     }
 
-    public mutating func addDeletedSnapshot(_ snapshot: AyuGramMessageSnapshot) {
+    @discardableResult
+    public mutating func addDeletedSnapshot(
+        _ snapshot: AyuGramMessageSnapshot,
+        limit: Int = Self.defaultDeletedSnapshotsLimit
+    ) -> [AyuGramMessageSnapshot] {
         if let index = self.deletedSnapshots.firstIndex(where: { $0.hasSameMessageIdentity(as: snapshot) }) {
             self.deletedSnapshots[index] = snapshot
         } else {
             self.deletedSnapshots.append(snapshot)
         }
+        return self.trimDeletedSnapshots(limit: limit)
     }
 
     public func listEditedSnapshots(
@@ -52,13 +72,17 @@ public struct AyuGramMessageHistoryStore: Codable, Equatable {
     public func listDeletedSnapshots(
         accountPeerId: Int64,
         peerId: Int64,
-        searchQuery: String? = nil
+        searchQuery: String? = nil,
+        offset: Int = 0,
+        limit: Int? = nil
     ) -> [AyuGramMessageSnapshot] {
         return self.filteredDeletedSnapshots(
             accountPeerId: accountPeerId,
             peerId: peerId,
             searchQuery: searchQuery,
-            threadMatches: { _ in true }
+            threadMatches: { _ in true },
+            offset: offset,
+            limit: limit
         )
     }
 
@@ -66,27 +90,56 @@ public struct AyuGramMessageHistoryStore: Codable, Equatable {
         accountPeerId: Int64,
         peerId: Int64,
         threadId: Int64,
-        searchQuery: String? = nil
+        searchQuery: String? = nil,
+        offset: Int = 0,
+        limit: Int? = nil
     ) -> [AyuGramMessageSnapshot] {
         return self.filteredDeletedSnapshots(
             accountPeerId: accountPeerId,
             peerId: peerId,
             searchQuery: searchQuery,
-            threadMatches: { snapshot in snapshot.threadId == threadId }
+            threadMatches: { snapshot in snapshot.threadId == threadId },
+            offset: offset,
+            limit: limit
         )
     }
 
     public func listDeletedSnapshotsWithoutThread(
         accountPeerId: Int64,
         peerId: Int64,
-        searchQuery: String? = nil
+        searchQuery: String? = nil,
+        offset: Int = 0,
+        limit: Int? = nil
     ) -> [AyuGramMessageSnapshot] {
         return self.filteredDeletedSnapshots(
             accountPeerId: accountPeerId,
             peerId: peerId,
             searchQuery: searchQuery,
-            threadMatches: { snapshot in snapshot.threadId == nil }
+            threadMatches: { snapshot in snapshot.threadId == nil },
+            offset: offset,
+            limit: limit
         )
+    }
+
+    @discardableResult
+    public mutating func trimDeletedSnapshots(limit: Int) -> [AyuGramMessageSnapshot] {
+        if limit <= 0 {
+            let removed = self.deletedSnapshots
+            self.deletedSnapshots.removeAll()
+            return removed.sorted(by: Self.areSnapshotsInAscendingHistoryOrder)
+        }
+
+        guard self.deletedSnapshots.count > limit else {
+            return []
+        }
+
+        let ordered = self.deletedSnapshots.sorted(by: Self.areSnapshotsInAscendingHistoryOrder)
+        let removed = Array(ordered.prefix(self.deletedSnapshots.count - limit))
+        let removedIdentities = Set(removed.map(AyuGramDeletedSnapshotIdentity.init))
+        self.deletedSnapshots.removeAll { snapshot in
+            return removedIdentities.contains(AyuGramDeletedSnapshotIdentity(snapshot))
+        }
+        return removed
     }
 
     @discardableResult
@@ -145,19 +198,23 @@ public struct AyuGramMessageHistoryStore: Codable, Equatable {
         accountPeerId: Int64,
         peerId: Int64,
         searchQuery: String?,
-        threadMatches: (AyuGramMessageSnapshot) -> Bool
+        threadMatches: (AyuGramMessageSnapshot) -> Bool,
+        offset: Int,
+        limit: Int?
     ) -> [AyuGramMessageSnapshot] {
         let normalizedSearchQuery = searchQuery?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
 
-        return self.deletedSnapshots.filter { snapshot in
+        let filtered = self.deletedSnapshots.filter { snapshot in
             if snapshot.accountPeerId != accountPeerId || snapshot.peerId != peerId || !threadMatches(snapshot) {
                 return false
             }
             if let normalizedSearchQuery = normalizedSearchQuery, !normalizedSearchQuery.isEmpty {
-                return snapshot.text.lowercased().contains(normalizedSearchQuery)
+                return Self.snapshotMatchesSearchQuery(snapshot, normalizedSearchQuery: normalizedSearchQuery)
             }
             return true
         }.sorted(by: Self.areSnapshotsInDescendingHistoryOrder)
+
+        return Self.pageSnapshots(filtered, offset: offset, limit: limit)
     }
 
     private mutating func removeDeletedSnapshots(_ shouldRemove: (AyuGramMessageSnapshot) -> Bool) -> Int {
@@ -172,6 +229,8 @@ public struct AyuGramMessageHistoryStore: Codable, Equatable {
         return lhs.hasSameMessageIdentity(as: rhs)
             && lhs.threadId == rhs.threadId
             && lhs.stableId == rhs.stableId
+            && lhs.globallyUniqueId == rhs.globallyUniqueId
+            && lhs.groupingKey == rhs.groupingKey
             && lhs.authorPeerId == rhs.authorPeerId
             && lhs.timestamp == rhs.timestamp
             && lhs.editTimestamp == rhs.editTimestamp
@@ -186,6 +245,23 @@ public struct AyuGramMessageHistoryStore: Codable, Equatable {
             && lhs.mediaFileName == rhs.mediaFileName
             && lhs.mediaDuration == rhs.mediaDuration
             && lhs.mediaDimensions == rhs.mediaDimensions
+            && lhs.mediaResourceLocalPath == rhs.mediaResourceLocalPath
+            && lhs.mediaThumbnailLocalPath == rhs.mediaThumbnailLocalPath
+            && lhs.forwardAuthorPeerId == rhs.forwardAuthorPeerId
+            && lhs.forwardSourcePeerId == rhs.forwardSourcePeerId
+            && lhs.forwardSourceMessageNamespace == rhs.forwardSourceMessageNamespace
+            && lhs.forwardSourceMessageId == rhs.forwardSourceMessageId
+            && lhs.forwardDate == rhs.forwardDate
+            && lhs.forwardAuthorSignature == rhs.forwardAuthorSignature
+            && lhs.forwardPsaType == rhs.forwardPsaType
+            && lhs.forwardFlags == rhs.forwardFlags
+            && lhs.replyMessagePeerId == rhs.replyMessagePeerId
+            && lhs.replyMessageNamespace == rhs.replyMessageNamespace
+            && lhs.replyMessageId == rhs.replyMessageId
+            && lhs.replyThreadMessagePeerId == rhs.replyThreadMessagePeerId
+            && lhs.replyThreadMessageNamespace == rhs.replyThreadMessageNamespace
+            && lhs.replyThreadMessageId == rhs.replyThreadMessageId
+            && lhs.replyIsQuote == rhs.replyIsQuote
     }
 
     public init(from decoder: Decoder) throws {
@@ -233,6 +309,12 @@ public struct AyuGramMessageHistoryStore: Codable, Equatable {
         if lhs.stableId != rhs.stableId {
             return Self.isOptionalInt64Ascending(lhs.stableId, rhs.stableId)
         }
+        if lhs.globallyUniqueId != rhs.globallyUniqueId {
+            return Self.isOptionalInt64Ascending(lhs.globallyUniqueId, rhs.globallyUniqueId)
+        }
+        if lhs.groupingKey != rhs.groupingKey {
+            return Self.isOptionalInt64Ascending(lhs.groupingKey, rhs.groupingKey)
+        }
         if lhs.authorPeerId != rhs.authorPeerId {
             return Self.isOptionalInt64Ascending(lhs.authorPeerId, rhs.authorPeerId)
         }
@@ -269,7 +351,13 @@ public struct AyuGramMessageHistoryStore: Codable, Equatable {
         if lhs.mediaDuration != rhs.mediaDuration {
             return Self.isOptionalDoubleAscending(lhs.mediaDuration, rhs.mediaDuration)
         }
-        return Self.optionalStringSortKey(lhs.mediaDimensions) < Self.optionalStringSortKey(rhs.mediaDimensions)
+        if lhs.mediaDimensions != rhs.mediaDimensions {
+            return Self.optionalStringSortKey(lhs.mediaDimensions) < Self.optionalStringSortKey(rhs.mediaDimensions)
+        }
+        if lhs.mediaResourceLocalPath != rhs.mediaResourceLocalPath {
+            return Self.optionalStringSortKey(lhs.mediaResourceLocalPath) < Self.optionalStringSortKey(rhs.mediaResourceLocalPath)
+        }
+        return Self.optionalStringSortKey(lhs.mediaThumbnailLocalPath) < Self.optionalStringSortKey(rhs.mediaThumbnailLocalPath)
     }
 
     private static func areSnapshotsInDescendingHistoryOrder(
@@ -302,6 +390,12 @@ public struct AyuGramMessageHistoryStore: Codable, Equatable {
         }
         if lhs.stableId != rhs.stableId {
             return Self.isOptionalInt64Descending(lhs.stableId, rhs.stableId)
+        }
+        if lhs.globallyUniqueId != rhs.globallyUniqueId {
+            return Self.isOptionalInt64Descending(lhs.globallyUniqueId, rhs.globallyUniqueId)
+        }
+        if lhs.groupingKey != rhs.groupingKey {
+            return Self.isOptionalInt64Descending(lhs.groupingKey, rhs.groupingKey)
         }
         if lhs.authorPeerId != rhs.authorPeerId {
             return Self.isOptionalInt64Descending(lhs.authorPeerId, rhs.authorPeerId)
@@ -339,7 +433,50 @@ public struct AyuGramMessageHistoryStore: Codable, Equatable {
         if lhs.mediaDuration != rhs.mediaDuration {
             return Self.isOptionalDoubleDescending(lhs.mediaDuration, rhs.mediaDuration)
         }
-        return Self.optionalStringSortKey(lhs.mediaDimensions) > Self.optionalStringSortKey(rhs.mediaDimensions)
+        if lhs.mediaDimensions != rhs.mediaDimensions {
+            return Self.optionalStringSortKey(lhs.mediaDimensions) > Self.optionalStringSortKey(rhs.mediaDimensions)
+        }
+        if lhs.mediaResourceLocalPath != rhs.mediaResourceLocalPath {
+            return Self.optionalStringSortKey(lhs.mediaResourceLocalPath) > Self.optionalStringSortKey(rhs.mediaResourceLocalPath)
+        }
+        return Self.optionalStringSortKey(lhs.mediaThumbnailLocalPath) > Self.optionalStringSortKey(rhs.mediaThumbnailLocalPath)
+    }
+
+    private static func snapshotMatchesSearchQuery(
+        _ snapshot: AyuGramMessageSnapshot,
+        normalizedSearchQuery: String
+    ) -> Bool {
+        return [
+            Optional(snapshot.text),
+            snapshot.mediaSummary,
+            snapshot.mediaKind,
+            snapshot.mediaMimeType,
+            snapshot.mediaFileName,
+            snapshot.mediaResourceId,
+            snapshot.mediaThumbnailResourceId
+        ].contains { value in
+            return value?.lowercased().contains(normalizedSearchQuery) == true
+        }
+    }
+
+    private static func pageSnapshots(
+        _ snapshots: [AyuGramMessageSnapshot],
+        offset: Int,
+        limit: Int?
+    ) -> [AyuGramMessageSnapshot] {
+        let safeOffset = max(0, offset)
+        guard safeOffset < snapshots.count else {
+            return []
+        }
+
+        if let limit = limit {
+            guard limit > 0 else {
+                return []
+            }
+            return Array(snapshots.dropFirst(safeOffset).prefix(limit))
+        }
+
+        return Array(snapshots.dropFirst(safeOffset))
     }
 
     private static func optionalDataSortKey(_ data: Data?) -> String {

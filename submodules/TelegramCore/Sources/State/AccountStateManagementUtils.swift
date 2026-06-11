@@ -3928,8 +3928,167 @@ private struct AyuGramMediaMetadata {
     var dimensions: String?
 }
 
+private struct AyuGramPersistedMediaLocalPaths {
+    var primary: String?
+    var thumbnail: String?
+}
+
 private func ayuGramPixelDimensionsString(_ dimensions: PixelDimensions) -> String {
     return "\(dimensions.width)x\(dimensions.height)"
+}
+
+private func ayuGramMediaFileExtension(kind: String?, mimeType: String?) -> String? {
+    if let mimeType = mimeType?.lowercased() {
+        switch mimeType {
+        case "image/jpeg":
+            return "jpg"
+        case "image/png":
+            return "png"
+        case "image/gif":
+            return "gif"
+        case "image/webp":
+            return "webp"
+        case "video/mp4":
+            return "mp4"
+        case "video/quicktime":
+            return "mov"
+        case "audio/mpeg":
+            return "mp3"
+        case "audio/mp4":
+            return "m4a"
+        case "audio/ogg":
+            return "ogg"
+        case "application/pdf":
+            return "pdf"
+        case "application/zip":
+            return "zip"
+        case "text/plain":
+            return "txt"
+        default:
+            break
+        }
+    }
+
+    switch kind {
+    case "image", "liveImage", "imageFile":
+        return "jpg"
+    case "video", "roundVideo":
+        return "mp4"
+    default:
+        return nil
+    }
+}
+
+private func ayuGramMessageMediaStorageDirectory() -> String? {
+    guard let baseUrl = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+        return nil
+    }
+
+    let directoryUrl = baseUrl.appendingPathComponent("AyuGramMessageMedia", isDirectory: true)
+    do {
+        try FileManager.default.createDirectory(at: directoryUrl, withIntermediateDirectories: true)
+        return directoryUrl.path
+    } catch {
+        return nil
+    }
+}
+
+private func ayuGramStableHash(_ value: String) -> String {
+    var hash: UInt64 = 0xcbf29ce484222325
+    for byte in value.utf8 {
+        hash ^= UInt64(byte)
+        hash = hash &* 0x100000001b3
+    }
+    return String(hash, radix: 16)
+}
+
+private func ayuGramPersistMediaResource(
+    resourceId: String?,
+    role: String,
+    accountPeerId: PeerId,
+    message: Message,
+    mediaBox: MediaBox,
+    kind: String?,
+    mimeType: String?
+) -> String? {
+    guard let resourceId, let sourcePath = mediaBox.completedResourcePath(id: MediaResourceId(resourceId)) else {
+        return nil
+    }
+    guard FileManager.default.fileExists(atPath: sourcePath), let directory = ayuGramMessageMediaStorageDirectory() else {
+        return nil
+    }
+
+    var fileName = [
+        "\(accountPeerId.toInt64())",
+        "\(message.id.peerId.toInt64())",
+        "\(message.id.namespace)",
+        "\(message.id.id)",
+        role,
+        ayuGramStableHash(resourceId)
+    ].joined(separator: "_")
+    if let ext = ayuGramMediaFileExtension(kind: kind, mimeType: mimeType) {
+        fileName += ".\(ext)"
+    }
+
+    let destinationPath = (directory as NSString).appendingPathComponent(fileName)
+    if FileManager.default.fileExists(atPath: destinationPath) {
+        return destinationPath
+    }
+
+    do {
+        try? FileManager.default.removeItem(atPath: destinationPath)
+        try FileManager.default.copyItem(atPath: sourcePath, toPath: destinationPath)
+        return destinationPath
+    } catch {
+        return nil
+    }
+}
+
+private func ayuGramPersistedMediaLocalPaths(
+    metadata: AyuGramMediaMetadata?,
+    accountPeerId: PeerId,
+    message: Message,
+    mediaBox: MediaBox?
+) -> AyuGramPersistedMediaLocalPaths {
+    guard let metadata, let mediaBox else {
+        return AyuGramPersistedMediaLocalPaths(primary: nil, thumbnail: nil)
+    }
+
+    let primaryPath = ayuGramPersistMediaResource(
+        resourceId: metadata.resourceId,
+        role: "primary",
+        accountPeerId: accountPeerId,
+        message: message,
+        mediaBox: mediaBox,
+        kind: metadata.kind,
+        mimeType: metadata.mimeType
+    )
+    let thumbnailPath = ayuGramPersistMediaResource(
+        resourceId: metadata.thumbnailResourceId,
+        role: "thumbnail",
+        accountPeerId: accountPeerId,
+        message: message,
+        mediaBox: mediaBox,
+        kind: "image",
+        mimeType: "image/jpeg"
+    )
+
+    return AyuGramPersistedMediaLocalPaths(primary: primaryPath, thumbnail: thumbnailPath)
+}
+
+private func ayuGramRemovePersistedMediaFiles(from snapshots: [AyuGramMessageSnapshot]) {
+    var paths = Set<String>()
+    for snapshot in snapshots {
+        if let path = snapshot.mediaResourceLocalPath {
+            paths.insert(path)
+        }
+        if let path = snapshot.mediaThumbnailLocalPath {
+            paths.insert(path)
+        }
+    }
+    for path in paths {
+        try? FileManager.default.removeItem(atPath: path)
+    }
 }
 
 private func ayuGramMediaMetadata(from message: Message) -> AyuGramMediaMetadata? {
@@ -4031,10 +4190,18 @@ private func ayuGramMediaMetadata(from message: Message) -> AyuGramMediaMetadata
 private func ayuGramMessageSnapshot(
     accountPeerId: PeerId,
     message: Message,
-    editTimestamp: Int32?
+    editTimestamp: Int32?,
+    mediaBox: MediaBox?
 ) -> AyuGramMessageSnapshot {
     let views = (message.attributes.first(where: { $0 is ViewCountMessageAttribute }) as? ViewCountMessageAttribute)?.count
     let mediaMetadata = ayuGramMediaMetadata(from: message)
+    let localMediaPaths = ayuGramPersistedMediaLocalPaths(
+        metadata: mediaMetadata,
+        accountPeerId: accountPeerId,
+        message: message,
+        mediaBox: mediaBox
+    )
+    let replyAttribute = message.attributes.first(where: { $0 is ReplyMessageAttribute }) as? ReplyMessageAttribute
 
     return AyuGramMessageSnapshot(
         accountPeerId: accountPeerId.toInt64(),
@@ -4043,6 +4210,8 @@ private func ayuGramMessageSnapshot(
         messageNamespace: message.id.namespace,
         messageId: message.id.id,
         stableId: Int64(message.stableId),
+        globallyUniqueId: message.globallyUniqueId,
+        groupingKey: message.groupingKey,
         authorPeerId: message.author?.id.toInt64(),
         timestamp: message.timestamp,
         editTimestamp: editTimestamp,
@@ -4058,6 +4227,23 @@ private func ayuGramMessageSnapshot(
         mediaFileName: mediaMetadata?.fileName,
         mediaDuration: mediaMetadata?.duration,
         mediaDimensions: mediaMetadata?.dimensions,
+        mediaResourceLocalPath: localMediaPaths.primary,
+        mediaThumbnailLocalPath: localMediaPaths.thumbnail,
+        forwardAuthorPeerId: message.forwardInfo?.author?.id.toInt64(),
+        forwardSourcePeerId: message.forwardInfo?.source?.id.toInt64(),
+        forwardSourceMessageNamespace: message.forwardInfo?.sourceMessageId?.namespace,
+        forwardSourceMessageId: message.forwardInfo?.sourceMessageId?.id,
+        forwardDate: message.forwardInfo?.date,
+        forwardAuthorSignature: message.forwardInfo?.authorSignature,
+        forwardPsaType: message.forwardInfo?.psaType,
+        forwardFlags: message.forwardInfo?.flags.rawValue,
+        replyMessagePeerId: replyAttribute?.messageId.peerId.toInt64(),
+        replyMessageNamespace: replyAttribute?.messageId.namespace,
+        replyMessageId: replyAttribute?.messageId.id,
+        replyThreadMessagePeerId: replyAttribute?.threadMessageId?.peerId.toInt64(),
+        replyThreadMessageNamespace: replyAttribute?.threadMessageId?.namespace,
+        replyThreadMessageId: replyAttribute?.threadMessageId?.id,
+        replyIsQuote: replyAttribute?.isQuote,
         createdAt: Int32(CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970)
     )
 }
@@ -4090,7 +4276,7 @@ private func storeAyuGramEditedMessageSnapshot(
     }
 
     let editedTimestamp = (updatedMessage.attributes.first(where: { $0 is EditedMessageAttribute }) as? EditedMessageAttribute)?.date
-    let snapshot = ayuGramMessageSnapshot(accountPeerId: accountPeerId, message: previousMessage, editTimestamp: editedTimestamp)
+    let snapshot = ayuGramMessageSnapshot(accountPeerId: accountPeerId, message: previousMessage, editTimestamp: editedTimestamp, mediaBox: nil)
 
     transaction.updatePreferencesEntry(key: PreferencesKeys.ayuGramMessageHistoryStore(), { current in
         var store = current?.get(AyuGramMessageHistoryStore.self) ?? .empty
@@ -4103,6 +4289,7 @@ private func storeAyuGramDeletedMessageSnapshots(
     policy: AccountMessageHistoryPolicy,
     accountPeerId: PeerId,
     messages: [Message],
+    mediaBox: MediaBox,
     transaction: Transaction
 ) {
     guard policy.saveDeletedMessages else {
@@ -4116,20 +4303,22 @@ private func storeAyuGramDeletedMessageSnapshots(
         }
 
         let editTimestamp = (message.attributes.first(where: { $0 is EditedMessageAttribute }) as? EditedMessageAttribute)?.date
-        snapshots.append(ayuGramMessageSnapshot(accountPeerId: accountPeerId, message: message, editTimestamp: editTimestamp))
+        snapshots.append(ayuGramMessageSnapshot(accountPeerId: accountPeerId, message: message, editTimestamp: editTimestamp, mediaBox: mediaBox))
     }
 
     if snapshots.isEmpty {
         return
     }
 
+    var evictedSnapshots: [AyuGramMessageSnapshot] = []
     transaction.updatePreferencesEntry(key: PreferencesKeys.ayuGramMessageHistoryStore(), { current in
         var store = current?.get(AyuGramMessageHistoryStore.self) ?? .empty
         for snapshot in snapshots {
-            store.addDeletedSnapshot(snapshot)
+            evictedSnapshots.append(contentsOf: store.addDeletedSnapshot(snapshot, limit: Int(policy.deletedMessagesStorageLimit)))
         }
         return PreferencesEntry(store)
     })
+    ayuGramRemovePersistedMediaFiles(from: evictedSnapshots)
 }
 
 func replayFinalState(
@@ -4673,6 +4862,7 @@ func replayFinalState(
                     policy: messageHistoryPolicy,
                     accountPeerId: accountPeerId,
                     messages: messageIds.compactMap { transaction.getMessage($0) },
+                    mediaBox: mediaBox,
                     transaction: transaction
                 )
                 var resourceIds: [MediaResourceId] = []
@@ -4688,6 +4878,7 @@ func replayFinalState(
                     policy: messageHistoryPolicy,
                     accountPeerId: accountPeerId,
                     messages: ids.compactMap { transaction.getMessage($0) },
+                    mediaBox: mediaBox,
                     transaction: transaction
                 )
                 _internal_deleteMessages(transaction: transaction, mediaBox: mediaBox, ids: ids, manualAddMessageThreadStatsDifference: { id, add, remove in
@@ -4709,6 +4900,7 @@ func replayFinalState(
                     policy: messageHistoryPolicy,
                     accountPeerId: accountPeerId,
                     messages: deletedMessages,
+                    mediaBox: mediaBox,
                     transaction: transaction
                 )
                 var resourceIds: [MediaResourceId] = []

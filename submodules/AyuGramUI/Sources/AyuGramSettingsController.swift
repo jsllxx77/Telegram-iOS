@@ -54,6 +54,7 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
     case messageHistoryHeader
     case saveDeletedMessages(Bool)
     case saveMessagesHistory(Bool)
+    case deletedMessagesStorageLimit(Int32)
 
     case messageShotHeader
     case showMessageShot(Bool)
@@ -135,7 +136,7 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
         switch self {
         case .ghostModeHeader, .useGlobalGhostMode, .globalSendReadMessages:
             return AyuGramSettingsSection.ghostMode.rawValue
-        case .messageHistoryHeader, .saveDeletedMessages, .saveMessagesHistory:
+        case .messageHistoryHeader, .saveDeletedMessages, .saveMessagesHistory, .deletedMessagesStorageLimit:
             return AyuGramSettingsSection.messageHistory.rawValue
         case .messageShotHeader, .showMessageShot, .messageShotShowBackground, .messageShotShowDate, .messageShotShowReactions, .messageShotShowHeaderDecorations, .messageShotShowColorfulReplies, .messageShotRevealSpoilers, .messageShotEmbeddedTheme:
             return AyuGramSettingsSection.messageShot.rawValue
@@ -172,6 +173,8 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return 101
         case .saveMessagesHistory:
             return 102
+        case .deletedMessagesStorageLimit:
+            return 103
         case .messageShotHeader:
             return 150
         case .showMessageShot:
@@ -338,6 +341,14 @@ private enum AyuGramSettingsControllerEntry: ItemListNodeEntry {
             return ayuGramSwitchItem(presentationData: presentationData, title: "Save Deleted Messages", value: value, section: self.section, arguments: arguments, keyPath: \.saveDeletedMessages)
         case let .saveMessagesHistory(value):
             return ayuGramSwitchItem(presentationData: presentationData, title: "Save Message Edit History", value: value, section: self.section, arguments: arguments, keyPath: \.saveMessagesHistory)
+        case let .deletedMessagesStorageLimit(value):
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: localized("Deleted Messages Limit"), label: "\(value)", sectionId: self.section, style: .blocks, disclosureStyle: .none, action: {
+                arguments.updateSettings { settings in
+                    var settings = settings
+                    settings.deletedMessagesStorageLimit = nextValue(settings.deletedMessagesStorageLimit, values: [1000, 5000, 10000, 50000])
+                    return settings
+                }
+            })
 
         case .messageShotHeader:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: localized("MESSAGE SHOT"), sectionId: self.section)
@@ -563,6 +574,7 @@ private func ayuGramSettingsControllerEntries(settings: AyuGramSettings) -> [Ayu
     entries.append(.messageHistoryHeader)
     entries.append(.saveDeletedMessages(settings.saveDeletedMessages))
     entries.append(.saveMessagesHistory(settings.saveMessagesHistory))
+    entries.append(.deletedMessagesStorageLimit(settings.deletedMessagesStorageLimit))
 
     entries.append(.messageShotHeader)
     entries.append(.showMessageShot(settings.showMessageShot))

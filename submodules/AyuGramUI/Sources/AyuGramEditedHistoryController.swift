@@ -218,12 +218,43 @@ func ayuGramHistorySnapshotText(_ snapshot: AyuGramMessageSnapshot, ordinal: Int
         let displayStableId = policy.isEnabled ? hiddenValue : "\(stableId)"
         lines.append("\(localized("Stable ID")): \(displayStableId)")
     }
+    if let globallyUniqueId = snapshot.globallyUniqueId {
+        let displayGloballyUniqueId = policy.isEnabled ? hiddenValue : "\(globallyUniqueId)"
+        lines.append("\(localized("Global ID")): \(displayGloballyUniqueId)")
+    }
+    if let groupingKey = snapshot.groupingKey {
+        let displayGroupingKey = policy.isEnabled ? hiddenValue : "\(groupingKey)"
+        lines.append("\(localized("Grouping Key")): \(displayGroupingKey)")
+    }
     if let threadId = snapshot.threadId {
         let displayThreadId = policy.isEnabled ? hiddenValue : "\(threadId)"
         lines.append("\(localized("Thread ID")): \(displayThreadId)")
     }
+    if let forwardDate = snapshot.forwardDate {
+        let displayForwardAuthorId = policy.isEnabled ? hiddenValue : ayuGramOptionalInt64String(snapshot.forwardAuthorPeerId, languageCode: languageCode)
+        let displayForwardSourceId = policy.isEnabled ? hiddenValue : ayuGramOptionalInt64String(snapshot.forwardSourcePeerId, languageCode: languageCode)
+        lines.append("\(localized("Forward Author")): \(displayForwardAuthorId)")
+        lines.append("\(localized("Forward Source")): \(displayForwardSourceId)")
+        lines.append("\(localized("Forward Date")): \(ayuGramHistoryDateString(forwardDate, languageCode: languageCode))")
+        if let forwardSourceMessageNamespace = snapshot.forwardSourceMessageNamespace, let forwardSourceMessageId = snapshot.forwardSourceMessageId {
+            let displayForwardMessageId = policy.isEnabled ? hiddenValue : "\(forwardSourceMessageNamespace):\(forwardSourceMessageId)"
+            lines.append("\(localized("Forward Message ID")): \(displayForwardMessageId)")
+        }
+    }
+    if let replyMessagePeerId = snapshot.replyMessagePeerId, let replyMessageNamespace = snapshot.replyMessageNamespace, let replyMessageId = snapshot.replyMessageId {
+        let displayReplyPeerId = policy.isEnabled ? hiddenValue : "\(replyMessagePeerId)"
+        let displayReplyMessageId = policy.isEnabled ? hiddenValue : "\(replyMessageNamespace):\(replyMessageId)"
+        lines.append("\(localized("Reply Peer")): \(displayReplyPeerId)")
+        lines.append("\(localized("Reply Message ID")): \(displayReplyMessageId)")
+    }
     if let mediaSummary = snapshot.mediaSummary, !mediaSummary.isEmpty, !snapshot.text.isEmpty {
         lines.append("\(localized("Media")): \(mediaSummary)")
+    }
+    if let mediaFileName = snapshot.mediaFileName, !mediaFileName.isEmpty {
+        lines.append("\(localized("File")): \(mediaFileName)")
+    }
+    if snapshot.mediaResourceLocalPath != nil || snapshot.mediaThumbnailLocalPath != nil {
+        lines.append("\(localized("Media Saved")): \(localized("Yes"))")
     }
 
     return lines.joined(separator: "\n")

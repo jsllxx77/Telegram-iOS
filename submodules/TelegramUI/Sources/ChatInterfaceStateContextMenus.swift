@@ -55,6 +55,22 @@ private func ayuGramDeletedMessageAttribute(_ message: Message) -> AyuGramDelete
     return message.attributes.first(where: { $0 is AyuGramDeletedMessageAttribute }) as? AyuGramDeletedMessageAttribute
 }
 
+private func ayuGramRemoveDeletedMessageLocalMediaFiles(_ attribute: AyuGramDeletedMessageAttribute) {
+    var paths = Set<String>()
+    if let path = attribute.mediaPrimaryPath {
+        paths.insert(path)
+    }
+    if let path = attribute.mediaThumbnailPath {
+        paths.insert(path)
+    }
+    if let path = attribute.mediaPreviewPath {
+        paths.insert(path)
+    }
+    for path in paths {
+        try? FileManager.default.removeItem(atPath: path)
+    }
+}
+
 private func ayuGramDeletedBubbleContextMenuItems(
     chatPresentationInterfaceState: ChatPresentationInterfaceState,
     context: AccountContext,
@@ -110,6 +126,7 @@ private func ayuGramDeletedBubbleContextMenuItems(
                 messageNamespace: attribute.originalNamespace,
                 messageId: attribute.originalId
             )
+            ayuGramRemoveDeletedMessageLocalMediaFiles(attribute)
             return EnginePreferencesEntry(store)
         }.start()
         Queue.mainQueue().after(0.2, {

@@ -894,7 +894,7 @@ func chatHistoryEntriesForView(
                     let selection: ChatHistoryMessageSelection = .none
                     
                     let visibleThreadHeadMessages = messages.filter { message in
-                        return !ayuGramShouldHideChatHistoryMessage(message, settings: ayuGramSettings, store: ayuGramFilterStore)
+                        return ayuGramChatHistoryFilterReason(message, settings: ayuGramSettings, store: ayuGramFilterStore, cachedData: nil) == nil
                     }
                     guard let visibleTopMessage = visibleThreadHeadMessages.first else {
                         break loop

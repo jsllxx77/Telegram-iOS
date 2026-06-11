@@ -4285,7 +4285,7 @@ private func storeAyuGramEditedMessageSnapshot(
     })
 }
 
-private func storeAyuGramDeletedMessageSnapshots(
+func storeAyuGramDeletedMessageSnapshots(
     policy: AccountMessageHistoryPolicy,
     accountPeerId: PeerId,
     messages: [Message],

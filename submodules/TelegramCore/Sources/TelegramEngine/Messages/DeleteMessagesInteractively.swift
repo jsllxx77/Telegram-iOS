@@ -103,6 +103,15 @@ func deleteMessagesInteractively(transaction: Transaction, stateManager: Account
             }
         }
     }
+    if let stateManager = stateManager {
+        storeAyuGramDeletedMessageSnapshots(
+            policy: stateManager.ayuGramCurrentMessageHistoryPolicy(),
+            accountPeerId: stateManager.accountPeerId,
+            messages: messageIds.compactMap { transaction.getMessage($0.messageId) },
+            mediaBox: postbox.mediaBox,
+            transaction: transaction
+        )
+    }
     _internal_deleteMessages(transaction: transaction, mediaBox: postbox.mediaBox, ids: messageIds.map(\.messageId))
     
     stateManager?.notifyDeletedMessages(messageIds: messageIds.map(\.messageId))
@@ -248,4 +257,3 @@ func _internal_clearAuthorHistory(account: Account, peerId: PeerId, memberId: Pe
         }
     } |> switchToLatest
 }
-

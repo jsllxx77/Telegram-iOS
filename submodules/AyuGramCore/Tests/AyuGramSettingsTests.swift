@@ -31,4 +31,16 @@ final class AyuGramSettingsTests: XCTestCase {
 
         XCTAssertEqual(decoded.deletedMessagesStorageLimit, 10000)
     }
+
+    func testDrawerContactsAndCallsRoundTripWhenDisabled() throws {
+        let settings = AyuGramSettings(
+            showContactsInDrawer: false,
+            showCallsInDrawer: false
+        )
+        let data = try JSONEncoder().encode(settings)
+        let decoded = try JSONDecoder().decode(AyuGramSettings.self, from: data)
+
+        XCTAssertFalse(decoded.showContactsInDrawer)
+        XCTAssertFalse(decoded.showCallsInDrawer)
+    }
 }

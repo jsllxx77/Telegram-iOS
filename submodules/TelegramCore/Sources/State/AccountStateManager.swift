@@ -1887,6 +1887,10 @@ public final class AccountStateManager {
         func notifyDeletedMessages(messageIds: [MessageId]) {
             self.deletedMessagesPipe.putNext(messageIds.map { .messageId($0) })
         }
+
+        func ayuGramCurrentMessageHistoryPolicy() -> AccountMessageHistoryPolicy {
+            return self.messageHistoryPolicyValue.with { $0 }
+        }
         
         public func processIncomingCallUpdate(data: Data, completion: @escaping ((CallSessionRingingState, CallSession)?) -> Void) {
             var rawData = data
@@ -2038,6 +2042,12 @@ public final class AccountStateManager {
     public var deletedMessages: Signal<[DeletedMessageId], NoError> {
         return self.impl.signalWith { impl, subscriber in
             return impl.deletedMessages.start(next: subscriber.putNext, error: subscriber.putError, completed: subscriber.putCompletion)
+        }
+    }
+
+    func ayuGramCurrentMessageHistoryPolicy() -> AccountMessageHistoryPolicy {
+        return self.impl.syncWith { impl in
+            return impl.ayuGramCurrentMessageHistoryPolicy()
         }
     }
     

@@ -1749,7 +1749,7 @@ ios_application(
     ],
     app_icons = select({
         ":useLegacyAppIconSetting": [":DefaultAppIcon"],
-        "//conditions:default": [":{}_icon".format(name) for name in composer_icon_folders],
+        "//conditions:default": [":DefaultAppIcon"],
     }),
     alternate_icons = [
         ":{}".format(name) for name in alternate_icon_folders

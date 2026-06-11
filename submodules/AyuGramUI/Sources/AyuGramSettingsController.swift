@@ -788,9 +788,9 @@ public func ayuGramSettingsController(context: AccountContext) -> ViewController
     var presentControllerImpl: ((ViewController, Any?) -> Void)?
     let currentPresentationData = Atomic<PresentationData?>(value: nil)
     let arguments = AyuGramSettingsControllerArguments(updateSettings: { f in
-        let _ = updateAyuGramSettingsInteractively(accountManager: context.sharedContext.accountManager, f).start()
+        let _ = updateAyuGramSettingsInteractively(accountManager: context.sharedContext.accountManager, f).startStandalone()
     }, updateLiquidGlassStyle: { style in
-        let _ = updateAyuGramLiquidGlassStyleInteractively(accountManager: context.sharedContext.accountManager, style: style).start()
+        let _ = updateAyuGramLiquidGlassStyleInteractively(accountManager: context.sharedContext.accountManager, style: style).startStandalone()
     }, openFilters: {
         pushControllerImpl?(ayuGramFiltersController(context: context))
     }, presentationData: {
